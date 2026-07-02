@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Clients - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Clients</h1>
+    <span class="badge">{{ clients_data|length }} total</span>
+</div>
+
+{% if clients_data %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Sites</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in clients_data %}
+            <tr>
+                <td><strong>{{ item.client.name }}</strong></td>
+                <td>{{ item.client.email or '-' }}</td>
+                <td>
+                    {% if item.client.is_active %}
+                    <span class="status status-active">Active</span>
+                    {% else %}
+                    <span class="status status-inactive">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>{{ item.sites_count }}</td>
+                <td>{{ item.client.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                <td>
+                    <a href="/admin/clients/{{ item.client.id }}" class="btn btn-small">View</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>No clients yet. Create one via the API.</p>
+</div>
+{% endif %}
+{% endblock %}

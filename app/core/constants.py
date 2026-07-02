@@ -1,0 +1,52 @@
+VALID_EVENT_TYPES = [
+    "pageview",
+    "click",
+    "scroll",
+    "block_view",
+    "time_on_page",
+    "page_leave",
+    "form_submit",
+]
+
+VALID_REPORT_TYPES = [
+    "daily",
+    "weekly",
+    "manual",
+]
+
+VALID_CLASSIFICATION_CATEGORIES = [
+    "hero",
+    "services",
+    "pricing",
+    "reviews",
+    "faq",
+    "contacts",
+    "lead_form",
+    "cta",
+    "benefits",
+    "about",
+    "unknown",
+]
+
+SNAPSHOT_MAX_RAW_TEXT_LENGTH = 10000
+SNAPSHOT_MAX_TEXT_BLOCK_LENGTH = 1000
+SNAPSHOT_MAX_HEADINGS = 100
+SNAPSHOT_MAX_LINKS = 300
+SNAPSHOT_MAX_BUTTONS = 100
+SNAPSHOT_MAX_FORMS = 50
+SNAPSHOT_MAX_TEXT_BLOCKS = 100
+
+TRACKER_MAX_EVENT_TYPE_LENGTH = 50
+TRACKER_MAX_URL_LENGTH = 2000
+TRACKER_MAX_PATH_LENGTH = 2000
+TRACKER_MAX_TITLE_LENGTH = 500
+TRACKER_MAX_VISITOR_ID_LENGTH = 64
+TRACKER_MAX_SESSION_ID_LENGTH = 64
+TRACKER_MAX_METADATA_SIZE = 10000
+
+KNOWLEDGE_MAX_CHUNK_CONTENT_LENGTH = 2000
+KNOWLEDGE_RAW_TEXT_CHUNK_SIZE = 1000
+
+CLASSIFICATION_MAX_AI_TEXT_LENGTH = 3000
+
+REPORT_MAX_CONTEXT_LENGTH = 8000

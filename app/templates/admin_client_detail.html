@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}{{ client.name }} - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ client.name }}</h1>
+    <a href="/admin/clients" class="btn btn-secondary">Back to Clients</a>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-card">
+        <h3>Client Info</h3>
+        <div class="info-row">
+            <span class="label">Email:</span>
+            <span>{{ client.email or '-' }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Status:</span>
+            <span class="status {{ 'status-active' if client.is_active else 'status-inactive' }}">
+                {{ 'Active' if client.is_active else 'Inactive' }}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="label">Created:</span>
+            <span>{{ client.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Sites ({{ sites|length }})</h2>
+    {% if sites %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Site ID</th>
+                    <th>Domain</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for site in sites %}
+                <tr>
+                    <td><strong>{{ site.name }}</strong></td>
+                    <td><code>{{ site.site_id }}</code></td>
+                    <td>{{ site.domain }}</td>
+                    <td>
+                        {% if site.is_active %}
+                        <span class="status status-active">Active</span>
+                        {% else %}
+                        <span class="status status-inactive">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ site.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <a href="/admin/sites/{{ site.site_id }}" class="btn btn-small">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No sites yet. Create one via the API.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

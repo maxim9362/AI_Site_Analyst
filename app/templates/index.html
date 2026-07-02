@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h1>AI Site Analyst</h1>
+    <p class="subtitle">Service is running</p>
+    <div class="quick-links">
+        <a href="/admin/clients" class="btn btn-primary">View Clients</a>
+        <a href="/health" class="btn btn-secondary">Health Check</a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <h3>API</h3>
+        <p>REST API available at /api</p>
+    </div>
+    <div class="stat-card">
+        <h3>Tracker</h3>
+        <p>JavaScript tracker at /static/tracker/tracker.js</p>
+    </div>
+    <div class="stat-card">
+        <h3>Admin</h3>
+        <p>Admin panel at /admin/clients</p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site.name }} - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ site.name }}</h1>
+    <a href="/admin/clients" class="btn btn-secondary">Back to Clients</a>
+</div>
+
+<div class="detail-grid">
+    <div class="detail-card">
+        <h3>Site Info</h3>
+        <div class="info-row">
+            <span class="label">Site ID:</span>
+            <code>{{ site.site_id }}</code>
+        </div>
+        <div class="info-row">
+            <span class="label">Domain:</span>
+            <span>{{ site.domain }}</span>
+        </div>
+        <div class="info-row">
+            <span class="label">Status:</span>
+            <span class="status {{ 'status-active' if site.is_active else 'status-inactive' }}">
+                {{ 'Active' if site.is_active else 'Inactive' }}
+            </span>
+        </div>
+        <div class="info-row">
+            <span class="label">Created:</span>
+            <span>{{ site.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+        </div>
+    </div>
+
+    <div class="detail-card">
+        <h3>Embed Code</h3>
+        <div class="code-block">
+            <code>&lt;script src="http://localhost:8000/static/tracker/tracker.js" data-site-id="{{ site.site_id }}"&gt;&lt;/script&gt;</code>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="action-panel" data-site-id="{{ site.site_id }}">
+        <div>
+            <h2>Центр запуска MVP</h2>
+            <p>Запусти пайплайн после того, как tracker собрал хотя бы один снимок страницы.</p>
+        </div>
+        <div class="action-buttons">
+            {# Кнопки вызывают существующие API-эндпоинты и позволяют провести сайт через весь MVP-пайплайн из админки. #}
+            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/knowledge/build-latest">
+                Собрать знания
+            </button>
+            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/classify">
+                Классифицировать блоки
+            </button>
+            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/reports/generate?days=7">
+                Создать отчет
+            </button>
+            <button class="btn btn-primary" data-admin-action="sequence" data-endpoints="/api/sites/{{ site.site_id }}/knowledge/build-latest|/api/sites/{{ site.site_id }}/classify|/api/sites/{{ site.site_id }}/reports/generate?days=7">
+                Полный анализ
+            </button>
+        </div>
+        <div class="admin-action-status" aria-live="polite"></div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Готовность пайплайна</h2>
+    <div class="readiness-grid">
+        <div class="readiness-item {{ 'is-ready' if dashboard_counts.snapshots else 'is-waiting' }}">
+            <span class="readiness-label">Снимки страниц</span>
+            <strong>{{ dashboard_counts.snapshots }}</strong>
+        </div>
+        <div class="readiness-item {{ 'is-ready' if dashboard_counts.knowledge_chunks else 'is-waiting' }}">
+            <span class="readiness-label">Фрагменты знаний</span>
+            <strong>{{ dashboard_counts.knowledge_chunks }}</strong>
+        </div>
+        <div class="readiness-item {{ 'is-ready' if dashboard_counts.classifications else 'is-waiting' }}">
+            <span class="readiness-label">AI-классификации</span>
+            <strong>{{ dashboard_counts.classifications }}</strong>
+        </div>
+        <div class="readiness-item {{ 'is-ready' if dashboard_counts.reports else 'is-waiting' }}">
+            <span class="readiness-label">AI-отчеты</span>
+            <strong>{{ dashboard_counts.reports }}</strong>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Event Statistics</h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_pageviews }}</div>
+            <div class="stat-label">Pageviews</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_clicks }}</div>
+            <div class="stat-label">Clicks</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_scroll }}</div>
+            <div class="stat-label">Scrolls</div>
+        </div>
+        {# Новые карточки показывают, какие блоки увидели посетители и были ли отправки форм. #}
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_block_views }}</div>
+            <div class="stat-label">Block Views</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_form_submits }}</div>
+            <div class="stat-label">Form Submits</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_time_on_page }}</div>
+            <div class="stat-label">Time Events</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.total_page_leave }}</div>
+            <div class="stat-label">Page Leaves</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.unique_visitors }}</div>
+            <div class="stat-label">Unique Visitors</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.unique_sessions }}</div>
+            <div class="stat-label">Unique Sessions</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ event_stats.last_event_time.strftime('%H:%M') if event_stats.last_event_time else 'N/A' }}</div>
+            <div class="stat-label">Last Event</div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>AI Reports</h2>
+    {% if latest_report %}
+    <div class="report-card">
+        <div class="report-header">
+            <h3>Latest Report ({{ latest_report.created_at.strftime('%Y-%m-%d %H:%M') }})</h3>
+            <span class="badge badge-{{ latest_report.report_type }}">{{ latest_report.report_type }}</span>
+        </div>
+
+        <div class="report-section">
+            <h4>Summary</h4>
+            <p>{{ latest_report.summary }}</p>
+        </div>
+
+        <div class="report-section">
+            <h4>Main Problem</h4>
+            <p class="problem-text">{{ latest_report.main_problem }}</p>
+        </div>
+
+        {% if latest_report.funnel %}
+        <div class="report-section">
+            <h4>Funnel</h4>
+            <div class="funnel-grid">
+                {# Воронка показывает ключевые шаги заявки из последнего AI-отчета без перехода в API. #}
+                <div class="funnel-step">
+                    <span>Pageviews</span>
+                    <strong>{{ latest_report.funnel.get("pageviews", 0) }}</strong>
+                </div>
+                <div class="funnel-step">
+                    <span>Services</span>
+                    <strong>{{ latest_report.funnel.get("viewed_services", 0) }}</strong>
+                </div>
+                <div class="funnel-step">
+                    <span>Pricing</span>
+                    <strong>{{ latest_report.funnel.get("viewed_pricing", 0) }}</strong>
+                </div>
+                <div class="funnel-step">
+                    <span>CTA Clicks</span>
+                    <strong>{{ latest_report.funnel.get("clicked_cta", 0) }}</strong>
+                </div>
+                <div class="funnel-step">
+                    <span>WhatsApp</span>
+                    <strong>{{ latest_report.funnel.get("clicked_whatsapp", 0) }}</strong>
+                </div>
+                <div class="funnel-step">
+                    <span>Forms</span>
+                    <strong>{{ latest_report.funnel.get("submitted_form", 0) }}</strong>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if latest_report.recommendations %}
+        <div class="report-section">
+            <h4>Recommendations</h4>
+            {% for rec in latest_report.recommendations %}
+            <div class="recommendation">
+                <span class="priority priority-{{ rec.priority }}">{{ rec.priority }}</span>
+                <strong>{{ rec.title }}</strong>
+                <p>{{ rec.reason }}</p>
+                <p class="expected-effect">Expected: {{ rec.expected_effect }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if latest_report.strengths %}
+        <div class="report-section">
+            <h4>Strengths</h4>
+            <ul>
+                {% for strength in latest_report.strengths %}
+                <li class="strength">{{ strength }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if latest_report.weaknesses %}
+        <div class="report-section">
+            <h4>Weaknesses</h4>
+            <ul>
+                {% for weakness in latest_report.weaknesses %}
+                <li class="weakness">{{ weakness }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% if latest_report.missing_information %}
+        <div class="report-section">
+            <h4>Missing Information</h4>
+            <ul>
+                {% for item in latest_report.missing_information %}
+                <li class="missing">{{ item }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No reports yet. Generate one via API:</p>
+        <div class="code-block">
+            <code>POST /api/sites/{{ site.site_id }}/reports/generate</code>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Recent Events</h2>
+    {% if recent_events %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Visitor</th>
+                    <th>Path</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for event in recent_events %}
+                <tr>
+                    <td><span class="badge badge-{{ event.event_type }}">{{ event.event_type }}</span></td>
+                    <td><code>{{ event.visitor_id[:15] }}...</code></td>
+                    <td>{{ event.path }}</td>
+                    <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No events yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Recent Page Snapshots</h2>
+    {% if recent_snapshots %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Path</th>
+                    <th>Title</th>
+                    <th>Language</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for snapshot in recent_snapshots %}
+                <tr>
+                    <td>{{ snapshot.path }}</td>
+                    <td>{{ snapshot.title[:50] }}</td>
+                    <td>{{ snapshot.language or '-' }}</td>
+                    <td>{{ snapshot.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No snapshots yet.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Recent Knowledge Chunks</h2>
+    {% if recent_chunks %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th>Title</th>
+                    <th>Path</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for chunk in recent_chunks %}
+                <tr>
+                    <td><span class="badge badge-{{ chunk.chunk_type }}">{{ chunk.chunk_type }}</span></td>
+                    <td>{{ chunk.title[:50] }}</td>
+                    <td>{{ chunk.path }}</td>
+                    <td>{{ chunk.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No knowledge chunks yet. Build knowledge from a snapshot first.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>Recent AI Classifications</h2>
+    {% if recent_classifications %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Confidence</th>
+                    <th>Reason</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for classification in recent_classifications %}
+                <tr>
+                    <td><span class="badge badge-{{ classification.category }}">{{ classification.category }}</span></td>
+                    <td>{{ "%.0f"|format(classification.confidence * 100) }}%</td>
+                    <td>{{ classification.reason[:50] }}</td>
+                    <td>{{ classification.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No classifications yet. Run AI classification first.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
