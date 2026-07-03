@@ -139,6 +139,43 @@ body {
     margin-bottom: 2rem;
 }
 
+.dashboard-header {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.dashboard-header h1 {
+    color: #2c3e50;
+    margin: 0.25rem 0;
+}
+
+.dashboard-header p {
+    color: #7f8c8d;
+}
+
+.dashboard-header-meta {
+    display: grid;
+    gap: 0.45rem;
+    justify-items: end;
+}
+
+.back-link {
+    color: #3498db;
+    font-size: 0.9rem;
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
 .badge {
     background: #ecf0f1;
     padding: 0.25rem 0.75rem;
@@ -188,6 +225,23 @@ tr:hover {
 }
 
 .status-inactive {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge {
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.status-badge.is-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.is-inactive {
     background: #f8d7da;
     color: #721c24;
 }
@@ -242,6 +296,27 @@ tr:hover {
 .section h2 {
     margin-bottom: 1rem;
     color: #2c3e50;
+}
+
+.section-heading {
+    margin-bottom: 1rem;
+}
+
+.section-heading h2 {
+    margin-bottom: 0.35rem;
+}
+
+.section-heading p {
+    color: #7f8c8d;
+}
+
+.section-kicker {
+    color: #7f8c8d;
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
 }
 
 .empty-state {
@@ -333,6 +408,422 @@ code {
 
 .admin-action-status.is-error {
     color: #721c24;
+}
+
+.tracker-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 1rem;
+}
+
+.tracker-card p {
+    color: #555;
+}
+
+/* Карточка статуса показывает владельцу, на каком этапе находится обработка сайта. */
+.site-status-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 5px solid #95a5a6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: grid;
+    gap: 1.25rem;
+}
+
+.site-status-card.status-ready {
+    border-left-color: #28a745;
+}
+
+.site-status-card.status-processing {
+    border-left-color: #3498db;
+}
+
+.site-status-card.status-collecting_data {
+    border-left-color: #ffc107;
+}
+
+.site-status-card.status-no_data {
+    border-left-color: #95a5a6;
+}
+
+.site-status-main {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.site-status-kicker {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.site-status-main strong {
+    color: #2c3e50;
+    font-size: 1.5rem;
+}
+
+.site-status-main p {
+    color: #555;
+}
+
+.site-status-dates {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 0.75rem;
+}
+
+.site-status-dates div {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.8rem;
+}
+
+.site-status-dates span {
+    display: block;
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.site-status-dates strong {
+    color: #2c3e50;
+    font-size: 0.9rem;
+    word-break: break-word;
+}
+
+.site-status-checklist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.site-status-checklist span {
+    border-radius: 999px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.site-status-checklist .is-ready {
+    background: #d4edda;
+    color: #155724;
+}
+
+.site-status-checklist .is-waiting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 5px solid #95a5a6;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 1.25rem;
+}
+
+.status-card.status-ready {
+    border-left-color: #28a745;
+}
+
+.status-card.status-processing {
+    border-left-color: #3498db;
+}
+
+.status-card.status-collecting_data {
+    border-left-color: #ffc107;
+}
+
+.status-card.status-no_data {
+    border-left-color: #95a5a6;
+}
+
+.status-card-main strong {
+    color: #2c3e50;
+    display: block;
+    font-size: 1.6rem;
+    margin-bottom: 0.35rem;
+}
+
+.status-card-main p {
+    color: #555;
+}
+
+.status-readiness {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 0.75rem;
+}
+
+.status-readiness div {
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid #95a5a6;
+    padding: 0.75rem;
+}
+
+.status-readiness div.is-ready {
+    border-left-color: #28a745;
+}
+
+.status-readiness div.is-waiting {
+    border-left-color: #ffc107;
+}
+
+.status-readiness span {
+    color: #7f8c8d;
+    display: block;
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.status-readiness strong {
+    color: #2c3e50;
+}
+
+.section-note {
+    color: #7f8c8d;
+    margin-bottom: 1rem;
+}
+
+/* Простая аналитика переводит события трекера в понятные владельцу сайта показатели. */
+.simple-analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.analytics-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.analytics-card-wide {
+    grid-column: span 2;
+}
+
+.analytics-label {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.analytics-value {
+    color: #2c3e50;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.analytics-subline {
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.analytics-list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.analytics-list div,
+.simple-funnel div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.6rem 0.75rem;
+}
+
+.analytics-list span,
+.simple-funnel span {
+    color: #555;
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.analytics-list strong,
+.simple-funnel strong {
+    color: #2c3e50;
+    font-size: 1rem;
+}
+
+.simple-funnel {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.simple-funnel div {
+    border-left: 4px solid #3498db;
+}
+
+.analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+}
+
+.metric-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.25rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    display: grid;
+    gap: 0.75rem;
+}
+
+.metric-card p {
+    color: #555;
+}
+
+.metric-label {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.metric-number {
+    color: #2c3e50;
+    font-size: 2rem;
+    line-height: 1;
+}
+
+.metric-list,
+.funnel-list {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.metric-list div,
+.funnel-list div {
+    align-items: center;
+    background: #f8f9fa;
+    border-radius: 6px;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.6rem 0.75rem;
+}
+
+.metric-list span,
+.funnel-list span {
+    color: #555;
+    font-size: 0.9rem;
+    overflow-wrap: anywhere;
+}
+
+.metric-list strong,
+.funnel-list strong {
+    color: #2c3e50;
+}
+
+.funnel-card {
+    grid-column: span 2;
+}
+
+.funnel-list div {
+    border-left: 4px solid #3498db;
+}
+
+.ai-report-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.ai-report-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ai-report-meta span {
+    background: #f8f9fa;
+    border-radius: 999px;
+    color: #555;
+    font-size: 0.85rem;
+    padding: 0.35rem 0.7rem;
+}
+
+.clean-list {
+    display: grid;
+    gap: 0.65rem;
+    margin-left: 1.25rem;
+}
+
+.clean-list p {
+    margin-top: 0.25rem;
+}
+
+.technical-section {
+    background: #eef2f5;
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.technical-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.technical-summary div {
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.technical-summary span {
+    color: #7f8c8d;
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.technical-summary strong {
+    color: #2c3e50;
+    font-size: 1.4rem;
+}
+
+.technical-block {
+    margin-top: 1.5rem;
+}
+
+.technical-block h3 {
+    color: #2c3e50;
+    margin-bottom: 0.75rem;
+}
+
+@media (max-width: 760px) {
+    .dashboard-header {
+        display: grid;
+    }
+
+    .dashboard-header-meta {
+        justify-items: start;
+    }
+
+    .analytics-card-wide {
+        grid-column: span 1;
+    }
+
+    .funnel-card {
+        grid-column: span 1;
+    }
 }
 
 /* Карточки готовности показывают, где именно находится сайт в пайплайне анализа. */

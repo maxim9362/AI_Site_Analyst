@@ -49,11 +49,14 @@ async def admin_site_detail(request: Request, site_id: str, db: AsyncSession = D
         })
     return templates.TemplateResponse(request, "admin_site_detail.html", {
         "site": data["site"],
+        "site_status": data["site_status"],
+        "simple_analytics": data["simple_analytics"],
         "event_stats": data["event_stats"],
         "dashboard_counts": data["dashboard_counts"],
         "recent_events": data["recent_events"],
         "recent_snapshots": data["recent_snapshots"],
         "recent_chunks": data["recent_chunks"],
+        "recent_knowledge_chunks": data["recent_knowledge_chunks"],
         "recent_classifications": data["recent_classifications"],
         "latest_report": data["latest_report"],
     })

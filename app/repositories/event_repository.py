@@ -28,6 +28,13 @@ class EventRepository:
         result = await self.session.execute(select(func.count()).select_from(Event).where(Event.site_id == site_id))
         return result.scalar_one()
 
+    async def get_latest_created_at_by_site(self, site_id: uuid.UUID) -> datetime | None:
+        # Статус сайта использует только дату последнего события, без вывода visitor/session данных.
+        result = await self.session.execute(
+            select(func.max(Event.created_at)).where(Event.site_id == site_id)
+        )
+        return result.scalar_one_or_none()
+
     async def get_site_event_stats(self, site_id: uuid.UUID) -> dict:
         result = await self.session.execute(
             select(

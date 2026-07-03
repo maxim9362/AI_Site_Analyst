@@ -82,3 +82,11 @@ class PageSnapshotRead(BaseModel):
     text_blocks: list[dict] | None = None
     raw_text: str | None = None
     created_at: datetime
+
+
+class PageSnapshotAcceptedResponse(BaseModel):
+    # Ответ tracker endpoint остается быстрым, а старые данные snapshot доступны во вложенном поле data.
+    status: str
+    message: str
+    snapshot_id: uuid.UUID
+    data: PageSnapshotRead

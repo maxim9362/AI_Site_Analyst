@@ -14,6 +14,8 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.knowledge_repository import KnowledgeRepository
 from app.repositories.page_snapshot_repository import PageSnapshotRepository
 from app.repositories.site_repository import SiteRepository
+from app.services.simple_analytics_service import get_simple_site_analytics
+from app.services.site_status_service import get_site_processing_status
 
 
 class AdminDashboardService:
@@ -66,14 +68,19 @@ class AdminDashboardService:
         recent_chunks = await self.knowledge_repository.list_recent_chunks_by_site(site.id, limit=5)
         recent_classifications = await self.classification_repository.list_recent_classifications_by_site(site.id, limit=5)
         latest_report = await self.report_repository.get_latest_report_by_site(site.id)
+        site_status = await get_site_processing_status(self.session, public_site_id)
+        simple_analytics = await get_simple_site_analytics(self.session, public_site_id, days=7)
 
         return {
             "site": site,
+            "site_status": site_status,
+            "simple_analytics": simple_analytics,
             "event_stats": event_stats,
             "dashboard_counts": dashboard_counts,
             "recent_events": recent_events,
             "recent_snapshots": recent_snapshots,
             "recent_chunks": recent_chunks,
+            "recent_knowledge_chunks": recent_chunks,
             "recent_classifications": recent_classifications,
             "latest_report": latest_report,
         }

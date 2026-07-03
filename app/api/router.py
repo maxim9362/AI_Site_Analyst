@@ -7,6 +7,8 @@ from app.api.routes.events import router as events_router
 from app.api.routes.health import router as health_router
 from app.api.routes.knowledge import router as knowledge_router
 from app.api.routes.page_snapshots import router as page_snapshots_router
+from app.api.routes.simple_analytics import router as simple_analytics_router
+from app.api.routes.site_status import router as site_status_router
 from app.api.routes.sites import router as sites_router
 
 api_router = APIRouter(prefix="/api")
@@ -19,3 +21,5 @@ api_router.include_router(page_snapshots_router)
 api_router.include_router(knowledge_router)
 api_router.include_router(classifications_router)
 api_router.include_router(ai_reports_router)
+api_router.include_router(site_status_router)
+api_router.include_router(simple_analytics_router)

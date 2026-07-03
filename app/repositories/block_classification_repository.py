@@ -1,6 +1,8 @@
 import uuid
 
-from sqlalchemy import delete, select
+from datetime import datetime
+
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.block_classification import BlockClassification
@@ -36,3 +38,12 @@ class BlockClassificationRepository:
             select(BlockClassification).where(BlockClassification.site_id == site_id).order_by(BlockClassification.created_at.desc()).limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_classifications_by_site(self, site_id: uuid.UUID) -> int:
+        result = await self.session.execute(select(func.count()).select_from(BlockClassification).where(BlockClassification.site_id == site_id))
+        return result.scalar_one() or 0
+
+    async def get_latest_created_at_by_site(self, site_id: uuid.UUID) -> datetime | None:
+        # Статус показывает готовность AI-классификации, не раскрывая технические детали блоков.
+        result = await self.session.execute(select(func.max(BlockClassification.created_at)).where(BlockClassification.site_id == site_id))
+        return result.scalar_one_or_none()

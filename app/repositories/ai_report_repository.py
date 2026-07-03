@@ -1,6 +1,8 @@
 import uuid
 
-from sqlalchemy import select
+from datetime import datetime
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ai_report import AIReport
@@ -31,4 +33,13 @@ class AIReportRepository:
         result = await self.session.execute(
             select(AIReport).where(AIReport.site_id == site_id).order_by(AIReport.created_at.desc()).limit(1)
         )
+        return result.scalar_one_or_none()
+
+    async def count_reports_by_site(self, site_id: uuid.UUID) -> int:
+        result = await self.session.execute(select(func.count()).select_from(AIReport).where(AIReport.site_id == site_id))
+        return result.scalar_one() or 0
+
+    async def get_latest_created_at_by_site(self, site_id: uuid.UUID) -> datetime | None:
+        # Для верхнего статуса достаточно даты последнего AI-отчета.
+        result = await self.session.execute(select(func.max(AIReport.created_at)).where(AIReport.site_id == site_id))
         return result.scalar_one_or_none()

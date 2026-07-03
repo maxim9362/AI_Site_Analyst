@@ -160,6 +160,38 @@ Tracker собирает:
 
 Значения полей форм не отправляются. Сохраняются только метаданные полей: `name`, `type`, `placeholder`.
 
+## Background processing for page snapshots
+
+`POST /api/page-snapshots` теперь работает как быстрый tracker endpoint:
+
+1. Валидирует `site_id`, домен и активность сайта.
+2. Сохраняет page snapshot в PostgreSQL.
+3. Сразу возвращает ответ со статусом `accepted`.
+4. Запускает фоновую обработку через FastAPI `BackgroundTasks`.
+
+Фоновая обработка выполняет:
+
+- build knowledge из сохраненного snapshot;
+- AI-классификацию блоков сайта после успешного build knowledge.
+
+Ответ endpoint:
+
+```json
+{
+  "status": "accepted",
+  "message": "Page snapshot saved and background processing started",
+  "snapshot_id": "...",
+  "data": {
+    "id": "...",
+    "public_site_id": "site_xxxxxxxxxxxx"
+  }
+}
+```
+
+Фоновая задача открывает свою DB session и не использует session из HTTP-запроса. Если build knowledge падает, classification не запускается. Если classification падает, snapshot и knowledge chunks остаются сохраненными, а ошибка пишется в лог.
+
+Для production позже лучше заменить FastAPI `BackgroundTasks` на Celery + Redis, сохранив текущий слой `app/tasks/` как точку входа для задач.
+
 ## Проверка полного MVP-потока
 
 1. Открыть админку:
@@ -291,6 +323,106 @@ AI должен отвечать и делать выводы только на 
 - гарантии;
 - факты о компании;
 - причины поведения пользователей без опоры на данные.
+
+## Background processing for AI reports
+
+`POST /api/sites/{site_id}/reports/generate` по умолчанию быстро возвращает `accepted` и запускает генерацию AI-отчета через FastAPI `BackgroundTasks`.
+
+```bash
+curl -X POST "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/reports/generate"
+```
+
+Для ручной проверки можно дождаться результата в одном HTTP-запросе:
+
+```bash
+curl -X POST "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/reports/generate?sync=true"
+```
+
+Последний отчет:
+
+```bash
+curl "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/reports/latest"
+```
+
+Если Gemini не настроен, используется локальный fallback, чтобы MVP не падал во время smoke test.
+
+## Site processing status
+
+Статус сайта вычисляется по уже собранным данным, без отдельной таблицы задач:
+
+- `no_data` - нет событий и снимков страниц;
+- `collecting_data` - события уже есть, но снимков страниц нет;
+- `processing` - снимки страниц есть, но AI-отчета еще нет;
+- `ready` - AI-отчет уже создан.
+
+Проверка:
+
+```bash
+curl "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/status"
+```
+
+Ответ содержит понятные флаги готовности: события, снимки страниц, база знаний, AI-классификация и AI-отчеты.
+
+## Simple Analytics
+
+Простая аналитика показывает бизнес-показатели за выбранный период, по умолчанию за 7 дней:
+
+- посетители и сессии;
+- просмотры страниц и top pages;
+- вовлеченность по scroll depth;
+- клики и top clicks;
+- целевые действия: WhatsApp, телефон, email, формы, CTA;
+- простая воронка: визиты, услуги, цены, контакты, формы.
+
+Проверка:
+
+```bash
+curl "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/simple-analytics?days=7"
+```
+
+`days` ограничивается диапазоном 1-90. Если данных за период нет, endpoint возвращает нули и сообщение, что система собирает аналитику.
+
+## Admin Site Dashboard
+
+Страница сайта открывается по адресу:
+
+```text
+http://localhost:8000/admin/sites/PUT_SITE_ID_HERE
+```
+
+Порядок блоков:
+
+1. название сайта, домен, Site ID и активность;
+2. статус обработки;
+3. код подключения `tracker.js`;
+4. простая аналитика за 7 дней;
+5. последний AI-вывод;
+6. ручные MVP-действия;
+7. технические данные.
+
+Технические таблицы вынесены вниз. Они нужны для проверки работы системы, но владельцу сайта в первую очередь показываются понятные бизнес-показатели.
+
+Важно: админка пока без авторизации и не готова для публичного интернета.
+
+## Smoke test checklist
+
+Минимальная проверка этапа 11:
+
+```bash
+docker compose up --build -d
+docker compose exec app alembic upgrade head
+curl "http://localhost:8000/health"
+curl "http://localhost:8000/static/tracker/tracker.js"
+curl "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/status"
+curl "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/simple-analytics?days=7"
+curl -X POST "http://localhost:8000/api/sites/PUT_SITE_ID_HERE/reports/generate"
+```
+
+Также нужно проверить страницу:
+
+```text
+http://localhost:8000/admin/sites/PUT_SITE_ID_HERE
+```
 
 ## Ограничения MVP
 

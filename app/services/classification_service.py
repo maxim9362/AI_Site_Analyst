@@ -31,21 +31,26 @@ class ClassificationService:
 
         results = []
         for chunk in chunks:
-            if not chunk.content or len(chunk.content.strip()) < 10:
+            chunk_id = chunk.id
+            chunk_content = chunk.content or ""
+            chunk_path = chunk.path
+            chunk_type = chunk.chunk_type
+
+            if not chunk_content or len(chunk_content.strip()) < 10:
                 continue
 
-            existing = await self.classification_repository.get_classification_by_chunk(chunk.id)
+            existing = await self.classification_repository.get_classification_by_chunk(chunk_id)
             if existing:
-                await self.classification_repository.delete_classification_by_chunk(chunk.id)
+                await self.classification_repository.delete_classification_by_chunk(chunk_id)
 
-            ai_result = await ai_service.classify_text(chunk.content)
+            ai_result = await ai_service.classify_text(chunk_content)
 
             classification_data = {
                 "site_id": site.id,
-                "knowledge_chunk_id": chunk.id,
+                "knowledge_chunk_id": chunk_id,
                 "public_site_id": public_site_id,
-                "path": chunk.path,
-                "chunk_type": chunk.chunk_type,
+                "path": chunk_path,
+                "chunk_type": chunk_type,
                 "category": ai_result.get("category", "unknown"),
                 "confidence": ai_result.get("confidence", 0.0),
                 "reason": ai_result.get("reason", ""),
@@ -57,7 +62,9 @@ class ClassificationService:
                 classification = await self.classification_repository.create_classification(classification_data)
                 results.append(BlockClassificationRead.model_validate(classification))
             except Exception as e:
-                logger.error(f"Failed to create classification for chunk {chunk.id}: {e}")
+                # Если knowledge пересобрали параллельно, chunk мог исчезнуть между чтением и записью классификации.
+                await self.session.rollback()
+                logger.error(f"Failed to create classification for chunk {chunk_id}: {e}")
                 continue
 
         return results
