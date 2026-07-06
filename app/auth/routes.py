@@ -1,6 +1,6 @@
 import time
 
-from fastapi import APIRouter, Depends, Form, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, Response, status
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,13 +11,39 @@ from app.core.user_auth import USER_COOKIE, get_authenticated_user_id, sign_user
 from app.db.database import get_db
 from app.schemas.site import UserSiteCreate
 from app.schemas.user import UserCreate
+from app.services.demo_site_bootstrap_service import create_demo_site_for_user
 from app.services.site_service import SiteService
 from app.services.user_service import UserAlreadyExistsError, UserService
 from app.services.product_dashboard_service import ProductDashboardService
 from app.services.pagespeed_service import PageSpeedService
+from app.tasks.site_analysis_tasks import run_site_analysis_task
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+
+ANALYTICS_DETAIL_CONFIG = {
+    "visitors": {
+        "title": "Посетители",
+        "description": "Уникальные реальные посетители и сессии за выбранный период. Боты в эти показатели не входят.",
+    },
+    "pageviews": {
+        "title": "Просмотры",
+        "description": "Просмотры страниц реальными посетителями. Здесь видно, какие страницы открывали чаще всего.",
+    },
+    "clicks": {
+        "title": "Клики",
+        "description": "Нажатия по кнопкам и ссылкам. Помогает понять, какие элементы сайта вызывают действие.",
+    },
+    "goals": {
+        "title": "Цели",
+        "description": "Целевые действия: WhatsApp, телефон, email, CTA и формы.",
+    },
+    "bots": {
+        "title": "Боты",
+        "description": "Отдельный поток технических визитов: поисковые роботы, SEO-инструменты и preview-боты.",
+    },
+}
 
 
 def _redirect(location: str) -> Response:
@@ -34,6 +60,191 @@ def _set_user_cookie(response: Response, user_id) -> None:
         max_age=settings.ADMIN_SESSION_TTL_SECONDS,
         path="/",
     )
+
+
+def _build_analytics_detail(metric: str, analytics: dict) -> dict | None:
+    config = ANALYTICS_DETAIL_CONFIG.get(metric)
+    if not config:
+        return None
+
+    if metric == "visitors":
+        visitors = analytics["visitors"]
+        return {
+            **config,
+            "summary": [
+                {"label": "Уникальные посетители", "value": visitors["unique_visitors"]},
+                {"label": "Сессии", "value": visitors["unique_sessions"]},
+                {"label": "Период", "value": f"{analytics['period_days']} дней"},
+            ],
+            "sections": [
+                {
+                    "title": "Что это значит",
+                    "rows": [
+                        {"label": "Посетитель", "value": "Один уникальный visitor_id трекера"},
+                        {"label": "Сессия", "value": "Отдельный заход пользователя на сайт"},
+                        {"label": "Фильтрация", "value": "Из расчета исключены события с признаком bot"},
+                    ],
+                }
+            ],
+        }
+
+    if metric == "pageviews":
+        pageviews = analytics["pageviews"]
+        return {
+            **config,
+            "summary": [
+                {"label": "Всего просмотров", "value": pageviews["total"]},
+                {"label": "Страниц в топе", "value": len(pageviews["top_pages"])},
+                {"label": "Период", "value": f"{analytics['period_days']} дней"},
+            ],
+            "sections": [
+                {
+                    "title": "Популярные страницы",
+                    "rows": [
+                        {"label": f"{page['title']} · {page['path']}", "value": page["views"]}
+                        for page in pageviews["top_pages"]
+                    ],
+                    "empty": "Просмотров за период пока нет.",
+                }
+            ],
+        }
+
+    if metric == "clicks":
+        clicks = analytics["clicks"]
+        return {
+            **config,
+            "summary": [
+                {"label": "Всего кликов", "value": clicks["total"]},
+                {"label": "Элементов в топе", "value": len(clicks["top_clicks"])},
+                {"label": "Период", "value": f"{analytics['period_days']} дней"},
+            ],
+            "sections": [
+                {
+                    "title": "Главные клики",
+                    "rows": [
+                        {"label": click["label"], "value": click["count"]}
+                        for click in clicks["top_clicks"]
+                    ],
+                    "empty": "Кликов за период пока нет.",
+                }
+            ],
+        }
+
+    if metric == "goals":
+        goals = analytics["goals"]
+        funnel = analytics["funnel"]
+        return {
+            **config,
+            "summary": [
+                {"label": "Всего целей", "value": goals["total"]},
+                {"label": "Контактные действия", "value": funnel["contact_actions"]},
+                {"label": "Отправки форм", "value": goals["form_submits"]},
+            ],
+            "sections": [
+                {
+                    "title": "Разбивка целей",
+                    "rows": [
+                        {"label": "WhatsApp", "value": goals["whatsapp"]},
+                        {"label": "Телефон", "value": goals["phone"]},
+                        {"label": "Email", "value": goals["email"]},
+                        {"label": "CTA", "value": goals["cta"]},
+                        {"label": "Начали форму", "value": goals["form_starts"]},
+                        {"label": "Отправили форму", "value": goals["form_submits"]},
+                    ],
+                },
+                {
+                    "title": "Воронка",
+                    "rows": [
+                        {"label": "Зашли на сайт", "value": funnel["site_visits"]},
+                        {"label": "Смотрели услуги", "value": funnel["viewed_services"]},
+                        {"label": "Смотрели цены", "value": funnel["viewed_pricing"]},
+                        {"label": "Связались или нажали CTA", "value": funnel["contact_actions"]},
+                    ],
+                },
+            ],
+        }
+
+    bots = analytics["bots"]
+    return {
+        **config,
+        "summary": [
+            {"label": "Уникальные боты", "value": bots["unique_bots"]},
+            {"label": "Сессии ботов", "value": bots["unique_sessions"]},
+            {"label": "События ботов", "value": bots["total_events"]},
+        ],
+        "sections": [
+            {
+                "title": "Обнаруженные боты",
+                "rows": [
+                    {"label": f"{bot['name']} · {bot['category']}", "value": bot["events"]}
+                    for bot in bots["known_bots"]
+                ],
+                "empty": "Ботов за период не обнаружено.",
+            },
+            {
+                "title": "User-Agent",
+                "rows": [
+                    {"label": agent["user_agent"], "value": agent["events"]}
+                    for agent in bots["top_user_agents"]
+                ],
+                "empty": "User-Agent данных пока нет.",
+            },
+        ],
+    }
+
+
+def _score_status(score: float | None) -> str:
+    if score is None:
+        return "Нет данных"
+    if score >= 90:
+        return "Хорошо"
+    if score >= 50:
+        return "Нужно улучшить"
+    return "Плохо"
+
+
+def _build_pagespeed_detail(result) -> dict:
+    score_rows = [
+        {"label": "Performance", "value": result.performance_score, "status": _score_status(result.performance_score)},
+        {"label": "Accessibility", "value": result.accessibility_score, "status": _score_status(result.accessibility_score)},
+        {"label": "Best Practices", "value": result.best_practices_score, "status": _score_status(result.best_practices_score)},
+        {"label": "SEO", "value": result.seo_score, "status": _score_status(result.seo_score)},
+    ]
+    metrics = [
+        {
+            "label": item.get("label", key),
+            "value": item.get("display_value") or item.get("numeric_value") or "-",
+            "status": _score_status((item.get("score") or 0) * 100 if item.get("score") is not None else None),
+        }
+        for key, item in (result.metrics or {}).items()
+    ]
+    opportunities = [
+        {
+            "label": item.get("title") or item.get("id") or "Рекомендация",
+            "value": item.get("display_value") or f"{item.get('overall_savings_ms', 0)} ms",
+            "status": _score_status((item.get("score") or 0) * 100 if item.get("score") is not None else None),
+        }
+        for item in (result.opportunities or [])
+    ]
+    diagnostics = [
+        {
+            "label": item.get("title") or item.get("id") or "Диагностика",
+            "value": item.get("display_value") or "-",
+            "status": _score_status((item.get("score") or 0) * 100 if item.get("score") is not None else None),
+        }
+        for item in (result.diagnostics or [])
+    ]
+    good = [row for row in score_rows + metrics if row["status"] == "Хорошо"]
+    bad = [row for row in score_rows + metrics + opportunities + diagnostics if row["status"] in {"Плохо", "Нужно улучшить"}]
+
+    return {
+        "score_rows": score_rows,
+        "metrics": metrics,
+        "opportunities": opportunities,
+        "diagnostics": diagnostics,
+        "good": good[:8],
+        "bad": bad[:8],
+    }
 
 
 @router.get("/register")
@@ -80,7 +291,8 @@ async def register_submit(
             status_code=status.HTTP_409_CONFLICT,
         )
 
-    response = _redirect("/sites")
+    demo_site = await create_demo_site_for_user(db, user.id)
+    response = _redirect(f"/sites/{demo_site.site_id}" if demo_site else "/sites")
     _set_user_cookie(response, user.id)
     return response
 
@@ -247,6 +459,38 @@ async def user_site_dashboard(
     )
 
 
+@router.get("/sites/{site_id}/analytics/{metric}")
+async def user_site_analytics_detail(
+    site_id: str,
+    metric: str,
+    request: Request,
+    period: str = "7d",
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return _redirect("/login")
+
+    site_service = SiteService(db)
+    site = await site_service.get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    dashboard = await ProductDashboardService(db).get_site_dashboard(site.site_id, period=period)
+    if not dashboard or not dashboard.get("tracker_analytics"):
+        return _redirect(f"/sites/{site.site_id}")
+
+    detail = _build_analytics_detail(metric, dashboard["tracker_analytics"])
+    if not detail:
+        return _redirect(f"/sites/{site.site_id}")
+
+    return templates.TemplateResponse(
+        request,
+        "user_analytics_detail.html",
+        {"dashboard": dashboard, "site": dashboard["site"], "detail": detail, "metric": metric},
+    )
+
+
 @router.post("/sites/{site_id}/pagespeed/run")
 async def run_user_site_pagespeed(
     site_id: str,
@@ -263,4 +507,55 @@ async def run_user_site_pagespeed(
         return _redirect("/sites")
 
     await PageSpeedService(db).run_pagespeed(site.site_id, strategy=strategy)
+    return _redirect(f"/sites/{site.site_id}")
+
+
+@router.get("/sites/{site_id}/pagespeed/{strategy}")
+async def user_site_pagespeed_detail(
+    site_id: str,
+    strategy: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return _redirect("/login")
+
+    site = await SiteService(db).get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    pagespeed = await PageSpeedService(db).get_latest_by_site(site.site_id)
+    result = pagespeed.get(strategy)
+    if not result:
+        return _redirect(f"/sites/{site.site_id}")
+
+    return templates.TemplateResponse(
+        request,
+        "user_pagespeed_detail.html",
+        {
+            "site": site,
+            "strategy": strategy,
+            "result": result,
+            "detail": _build_pagespeed_detail(result),
+        },
+    )
+
+
+@router.post("/sites/{site_id}/analysis/run")
+async def run_user_site_analysis(
+    site_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = get_authenticated_user_id(request)
+    if not user_id:
+        return _redirect("/login")
+
+    site = await SiteService(db).get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    background_tasks.add_task(run_site_analysis_task, site.site_id, 7)
     return _redirect(f"/sites/{site.site_id}")

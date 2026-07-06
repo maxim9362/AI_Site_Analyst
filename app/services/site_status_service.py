@@ -19,13 +19,13 @@ def _build_status(
     has_events: bool,
     has_snapshots: bool,
     has_reports: bool,
-) -> tuple[str, str, str]:
-    # MVP-статус вычисляется по уже существующим данным, без отдельной таблицы задач.
+) -> tuple[str, str, str, str]:
     if has_reports:
         return (
             "ready",
             "Готово",
             "Сайт готов к анализу. Доступен AI-отчет и собранные данные.",
+            "Готово",
         )
 
     if has_snapshots:
@@ -33,6 +33,7 @@ def _build_status(
             "processing",
             "Идет обработка",
             "Страницы уже сохранены. Система строит базу знаний, классифицирует блоки и готовит данные для отчета.",
+            "Примерно 1-3 минуты",
         )
 
     if has_events:
@@ -40,12 +41,14 @@ def _build_status(
             "collecting_data",
             "Данные собираются",
             "Система уже получает события посетителей, но структура страниц пока не сохранена.",
+            "Примерно 3-7 минут после запуска анализа",
         )
 
     return (
         "no_data",
         "Данных пока нет",
         "Tracker подключен, но система пока не получила события или снимки страниц.",
+        "После первых визитов: около 5 минут",
     )
 
 
@@ -76,13 +79,14 @@ async def get_site_processing_status(
     has_classifications = classifications_count > 0
     has_reports = reports_count > 0
 
-    status, status_label, message = _build_status(has_events, has_snapshots, has_reports)
+    status, status_label, message, eta_label = _build_status(has_events, has_snapshots, has_reports)
 
     return {
         "site_id": public_site_id,
         "status": status,
         "status_label": status_label,
         "message": message,
+        "eta_label": eta_label,
         "has_events": has_events,
         "has_snapshots": has_snapshots,
         "has_knowledge": has_knowledge,

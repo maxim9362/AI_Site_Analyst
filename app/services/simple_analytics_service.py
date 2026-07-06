@@ -1,6 +1,7 @@
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -105,6 +106,7 @@ def _empty_analytics(days: int, message: str) -> dict[str, Any]:
             "known_bots": [],
             "top_user_agents": [],
         },
+        "realtime_search": _build_realtime_search_analytics([], [], days),
     }
 
 
@@ -196,6 +198,177 @@ def _build_top_pages(pageview_events: list[Event]) -> list[dict[str, Any]]:
     ]
 
 
+def _period_buckets(days: int) -> tuple[list[str], Any]:
+    period_end = datetime.now(timezone.utc)
+    if days <= 1:
+        labels = [
+            (period_end - timedelta(hours=offset)).strftime("%H:00")
+            for offset in reversed(range(24))
+        ]
+        return labels, lambda event: event.created_at.strftime("%H:00") if event.created_at else None
+
+    labels = [
+        (period_end - timedelta(days=offset)).date().isoformat()
+        for offset in reversed(range(days))
+    ]
+    return labels, lambda event: event.created_at.date().isoformat() if event.created_at else None
+
+
+def _extract_search_query(referrer: str | None) -> str | None:
+    if not referrer:
+        return None
+    parsed = urlparse(referrer)
+    host = parsed.netloc.lower()
+    if not any(search_host in host for search_host in ("google.", "bing.", "yandex.", "duckduckgo.")):
+        return None
+    params = parse_qs(parsed.query)
+    for key in ("q", "query", "text", "p"):
+        value = params.get(key, [""])[0].strip()
+        if value:
+            return value[:120]
+    return None
+
+
+def _device_label(user_agent: str | None) -> str:
+    value = (user_agent or "").lower()
+    if any(marker in value for marker in ("mobile", "iphone", "android")):
+        return "Mobile"
+    if any(marker in value for marker in ("ipad", "tablet")):
+        return "Tablet"
+    if value:
+        return "Desktop"
+    return "Unknown"
+
+
+def _source_label(event: Event) -> str:
+    referrer = (event.referrer or "").strip()
+    if not referrer:
+        return "Прямой заход"
+    host = urlparse(referrer).netloc.lower()
+    if any(search_host in host for search_host in ("google.", "bing.", "yandex.", "duckduckgo.")):
+        return "Поиск"
+    if any(social in host for social in ("facebook.", "instagram.", "t.co", "twitter.", "linkedin.", "vk.")):
+        return "Соцсети"
+    return host or "Реферал"
+
+
+def _count_rows(counter: Counter[str]) -> list[dict[str, Any]]:
+    return [
+        {"primary": primary, "clicks": 0, "impressions": count}
+        for primary, count in counter.most_common(8)
+    ]
+
+
+def _empty_realtime_search_analytics() -> dict[str, Any]:
+    return {
+        "updated_label": "обновляется в реальном времени",
+        "granularity": "daily",
+        "labels": [],
+        "summary": [],
+        "series": [],
+        "tabs": [],
+    }
+
+
+def _build_realtime_search_analytics(
+    human_events: list[Event],
+    bot_events: list[Event],
+    days: int,
+) -> dict[str, Any]:
+    labels, bucket_fn = _period_buckets(days)
+    pageview_events = [event for event in human_events if event.event_type == "pageview"]
+    click_events = [event for event in human_events if event.event_type == "click"]
+    goal_events = [
+        event for event in human_events
+        if event.event_type in ("goal", "form_start", "form_submit")
+    ]
+
+    visitors_by_bucket: dict[str, set[str]] = {label: set() for label in labels}
+    pageviews_by_bucket = Counter()
+    clicks_by_bucket = Counter()
+    goals_by_bucket = Counter()
+    bots_by_bucket = Counter()
+
+    for event in pageview_events:
+        bucket = bucket_fn(event)
+        if not bucket:
+            continue
+        pageviews_by_bucket[bucket] += 1
+        if event.visitor_id:
+            visitors_by_bucket.setdefault(bucket, set()).add(event.visitor_id)
+
+    for event in click_events:
+        bucket = bucket_fn(event)
+        if bucket:
+            clicks_by_bucket[bucket] += 1
+
+    for event in goal_events:
+        bucket = bucket_fn(event)
+        if bucket:
+            goals_by_bucket[bucket] += 1
+
+    for event in bot_events:
+        bucket = bucket_fn(event)
+        if bucket:
+            bots_by_bucket[bucket] += 1
+
+    query_counter = Counter(
+        query for query in (_extract_search_query(event.referrer) for event in pageview_events) if query
+    )
+    pages = Counter((event.path or "/") for event in pageview_events)
+    countries = Counter({"Unknown": len(pageview_events)}) if pageview_events else Counter()
+    devices = Counter(_device_label(event.user_agent) for event in pageview_events)
+    sources = Counter(_source_label(event) for event in pageview_events)
+    days_counter = Counter(event.created_at.date().isoformat() for event in pageview_events if event.created_at)
+
+    return {
+        "updated_label": "обновляется в реальном времени",
+        "granularity": "hourly" if days <= 1 else "daily",
+        "labels": labels,
+        "summary": [
+            {
+                "label": "Посетители",
+                "value": len({event.visitor_id for event in human_events if event.visitor_id}),
+                "color": "#4285f4",
+                "info": "Уникальные люди без ботов, которых определил наш трекер за выбранный период.",
+            },
+            {
+                "label": "Просмотры",
+                "value": len(pageview_events),
+                "color": "#673ab7",
+                "info": "Все просмотры страниц, которые пришли с установленного JS-кода сайта.",
+            },
+            {
+                "label": "Клики",
+                "value": len(click_events),
+                "color": "#0f9d58",
+                "info": "Нажатия по ссылкам, кнопкам и интерактивным элементам сайта.",
+            },
+            {
+                "label": "Цели",
+                "value": len(goal_events),
+                "color": "#f59e0b",
+                "info": "Целевые действия: формы, заявки, контакты и другие события конверсии.",
+            },
+        ],
+        "series": [
+            {"key": "visitors", "label": "Посетители", "color": "#4285f4", "values": [len(visitors_by_bucket.get(label, set())) for label in labels]},
+            {"key": "pageviews", "label": "Просмотры", "color": "#673ab7", "values": [pageviews_by_bucket.get(label, 0) for label in labels]},
+            {"key": "clicks", "label": "Клики", "color": "#0f9d58", "values": [clicks_by_bucket.get(label, 0) for label in labels]},
+            {"key": "goals", "label": "Цели", "color": "#f59e0b", "values": [goals_by_bucket.get(label, 0) for label in labels]},
+            {"key": "bots", "label": "Боты", "color": "#64748b", "values": [bots_by_bucket.get(label, 0) for label in labels]},
+        ],
+        "tabs": [
+            {"key": "queries", "label": "Запросы", "metric_label": "Показы", "empty": "Запросы появятся, если поисковик передаст query в referrer или после подключения Google.", "rows": _count_rows(query_counter)},
+            {"key": "pages", "label": "Страницы", "metric_label": "Просмотры", "empty": "Пока нет просмотров страниц.", "rows": _count_rows(pages)},
+            {"key": "countries", "label": "Страны", "metric_label": "Просмотры", "empty": "Страны появятся после добавления GeoIP или данных Google.", "rows": _count_rows(countries)},
+            {"key": "devices", "label": "Устройства", "metric_label": "Просмотры", "empty": "Пока нет данных по устройствам.", "rows": _count_rows(devices)},
+            {"key": "search_type", "label": "Вид в поиске", "metric_label": "Просмотры", "empty": "Пока нет источников трафика.", "rows": _count_rows(sources)},
+            {"key": "days", "label": "Дни", "metric_label": "Просмотры", "empty": "Пока нет данных по дням.", "rows": _count_rows(days_counter)},
+        ],
+    }
+
+
 def _build_scroll_stats(scroll_events: list[Event]) -> dict[str, int]:
     scroll_stats = {
         "scroll_25": 0,
@@ -275,6 +448,7 @@ async def get_simple_site_analytics(
             "Пока недостаточно данных. Система собирает аналитику.",
         )
         empty["timeseries"] = {"labels": [], "site_visits": [], "pageviews": []}
+        empty["realtime_search"] = _build_realtime_search_analytics([], [], days)
         return empty
 
     human_events = [event for event in events if not _is_bot_event(event)]
@@ -350,4 +524,5 @@ async def get_simple_site_analytics(
         },
         "timeseries": _build_timeseries(human_events, days),
         "bots": _build_bot_stats(bot_events),
+        "realtime_search": _build_realtime_search_analytics(human_events, bot_events, days),
     }

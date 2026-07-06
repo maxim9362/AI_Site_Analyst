@@ -104,3 +104,24 @@ class UserMigrationTests(unittest.TestCase):
         self.assertIn('down_revision: Union[str, None] = "010"', migration_source)
         self.assertIn('"google_client_id"', migration_source)
         self.assertIn('"google_client_secret"', migration_source)
+
+    def test_site_status_includes_eta(self):
+        source = Path("app/services/site_status_service.py").read_text(encoding="utf-8")
+
+        self.assertIn("eta_label", source)
+        self.assertIn("Примерно 1-3 минуты", source)
+        self.assertIn("После первых визитов", source)
+
+    def test_product_dashboard_builds_gsc_chart_data(self):
+        source = Path("app/services/product_dashboard_service.py").read_text(encoding="utf-8")
+
+        self.assertIn("gsc_chart_data", source)
+        self.assertIn("def _build_gsc_chart_data", source)
+        self.assertIn('"granularity": "hourly"', source)
+        self.assertIn('"summary": [', source)
+        self.assertIn('"key": "impressions"', source)
+        self.assertIn('"key": "position"', source)
+        self.assertIn("_merge_gsc_into_realtime_search", source)
+        self.assertIn('"key": "google_clicks"', source)
+        self.assertIn('"key": "google_position"', source)
+        self.assertIn('"info": "Сколько переходов на сайт пришло из результатов поиска Google."', source)

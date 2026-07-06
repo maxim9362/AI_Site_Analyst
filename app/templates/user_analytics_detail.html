@@ -1,0 +1,45 @@
+{% extends "user_base.html" %}
+
+{% block title %}{{ detail.title }} - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="product-header">
+    <div>
+        <a href="/sites/{{ site.site_id }}?period={{ dashboard.period }}" class="back-link">Назад к сайту</a>
+        <h1>{{ detail.title }}</h1>
+        <p>{{ detail.description }}</p>
+    </div>
+    <div class="product-header-meta">
+        <span>Период</span>
+        <code>{{ dashboard.period_label }}</code>
+    </div>
+</div>
+
+<section class="section">
+    <div class="product-metrics">
+        {% for item in detail.summary %}
+        <div class="metric-card">
+            <span class="metric-label">{{ item.label }}</span>
+            <strong class="metric-number">{{ item.value }}</strong>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section">
+    <div class="analytics-detail-grid">
+        {% for section in detail.sections %}
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">{{ section.title }}</span>
+            <div class="metric-list">
+                {% for row in section.rows %}
+                <div><span>{{ row.label }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>{{ section.empty or 'Данных пока нет' }}</span><strong>0</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "user_base.html" %}
+
+{% block title %}PageSpeed {{ strategy }} - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="product-header">
+    <div>
+        <a href="/sites/{{ site.site_id }}" class="back-link">Назад к сайту</a>
+        <h1>PageSpeed {{ strategy }}</h1>
+        <p>{{ result.url }}</p>
+    </div>
+    <div class="product-header-meta">
+        <span>Проверено</span>
+        <code>{{ result.fetched_at.strftime("%d.%m.%Y %H:%M") }}</code>
+    </div>
+</div>
+
+{% if result.error %}
+<section class="section">
+    <div class="status-card status-no_data">
+        <div class="status-card-main">
+            <span class="section-kicker">Ошибка проверки</span>
+            <strong>Данные не получены</strong>
+            <p>{{ result.error }}</p>
+            <p class="status-eta">Частая причина: лимит PageSpeed API или временная недоступность сайта. Попробуйте позже или проверьте другую стратегию.</p>
+        </div>
+    </div>
+</section>
+{% else %}
+<section class="section">
+    <div class="product-metrics">
+        {% for row in detail.score_rows %}
+        <div class="metric-card">
+            <span class="metric-label">{{ row.label }}</span>
+            <strong class="metric-number">{{ "%.0f"|format(row.value or 0) }}</strong>
+            <p>{{ row.status }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section">
+    <div class="analytics-detail-grid">
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">Что хорошо</span>
+            <div class="metric-list">
+                {% for row in detail.good %}
+                <div><span>{{ row.label }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>Сильных пунктов пока не найдено</span><strong>-</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">Что плохо / требует внимания</span>
+            <div class="metric-list">
+                {% for row in detail.bad %}
+                <div><span>{{ row.label }} · {{ row.status }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>Критичных проблем не найдено</span><strong>OK</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">Core Web Vitals</span>
+            <div class="metric-list">
+                {% for row in detail.metrics %}
+                <div><span>{{ row.label }} · {{ row.status }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>Метрик пока нет</span><strong>-</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">Рекомендации Lighthouse</span>
+            <div class="metric-list">
+                {% for row in detail.opportunities %}
+                <div><span>{{ row.label }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>Явных возможностей ускорения не найдено</span><strong>OK</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="metric-card analytics-detail-card">
+            <span class="metric-label">Диагностика</span>
+            <div class="metric-list">
+                {% for row in detail.diagnostics %}
+                <div><span>{{ row.label }} · {{ row.status }}</span><strong>{{ row.value }}</strong></div>
+                {% else %}
+                <div><span>Диагностических замечаний нет</span><strong>OK</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

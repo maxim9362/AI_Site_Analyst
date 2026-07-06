@@ -13,6 +13,7 @@
         <span>Site ID</span>
         <code>{{ site.site_id }}</code>
         <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код подключения</a>
+        <a class="btn btn-small" href="/demo?site_id={{ site.site_id }}" target="_blank" rel="noopener">Открыть демо</a>
     </div>
 </div>
 
@@ -63,7 +64,11 @@
             </div>
             <strong>{{ dashboard.site_status.status_label }}</strong>
             <p>{{ dashboard.site_status.message }}</p>
+            <p class="status-eta">Ожидаемое время: {{ dashboard.site_status.eta_label }}</p>
         </div>
+        <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+            <button class="btn btn-primary" type="submit">Запустить анализ</button>
+        </form>
     </div>
 </section>
 {% endif %}
@@ -83,31 +88,31 @@
     </div>
 
     <div class="product-metrics">
-        <div class="metric-card">
+        <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/visitors?period={{ dashboard.period }}">
             <span class="metric-label">Посетители</span>
             <strong class="metric-number">{{ dashboard.tracker_analytics.visitors.unique_visitors }}</strong>
             <p>Сессий: {{ dashboard.tracker_analytics.visitors.unique_sessions }}</p>
-        </div>
-        <div class="metric-card">
+        </a>
+        <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/pageviews?period={{ dashboard.period }}">
             <span class="metric-label">Просмотры</span>
             <strong class="metric-number">{{ dashboard.tracker_analytics.pageviews.total }}</strong>
             <p>Всего просмотров страниц</p>
-        </div>
-        <div class="metric-card">
+        </a>
+        <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/clicks?period={{ dashboard.period }}">
             <span class="metric-label">Клики</span>
             <strong class="metric-number">{{ dashboard.tracker_analytics.clicks.total }}</strong>
             <p>Нажатия по кнопкам и ссылкам</p>
-        </div>
-        <div class="metric-card">
+        </a>
+        <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/goals?period={{ dashboard.period }}">
             <span class="metric-label">Цели</span>
             <strong class="metric-number">{{ dashboard.tracker_analytics.goals.total }}</strong>
             <p>WhatsApp, телефон, email, CTA, формы</p>
-        </div>
-        <div class="metric-card">
+        </a>
+        <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/bots?period={{ dashboard.period }}">
             <span class="metric-label">Боты</span>
             <strong class="metric-number">{{ dashboard.tracker_analytics.bots.unique_bots }}</strong>
             <p>Событий: {{ dashboard.tracker_analytics.bots.total_events }}</p>
-        </div>
+        </a>
     </div>
 
     {% if dashboard.tracker_analytics.bots.known_bots %}
@@ -135,42 +140,97 @@
 </section>
 {% endif %}
 
-<section class="section">
+{% if dashboard.tracker_analytics and dashboard.tracker_analytics.realtime_search %}
+<section class="section realtime-search-section">
     <div class="section-heading">
-        <span class="section-kicker">Google Search Console</span>
+        <span class="section-kicker">Живая аналитика</span>
         <div class="section-title-row">
-            <h2>Поиск Google</h2>
+            <h2>Поиск и поведение в реальном времени</h2>
             <details class="info-popover">
                 <summary aria-label="Информация о блоке">i</summary>
-                <div>Показывает, как сайт виден в Google: показы, клики, CTR и среднюю позицию по поисковым запросам.</div>
+                <div>Блок построен на событиях нашего трекера: просмотры, клики, цели, устройства, источники и боты обновляются сразу после записи события.</div>
             </details>
         </div>
-        <p>{{ dashboard.gsc_summary.message or 'SEO-показатели за выбранный период.' }}</p>
+        <p>Данные обновляются без задержки Google. Позже сюда можно подставить Search Console API как отдельный источник.</p>
     </div>
 
-    <div class="product-metrics">
-        <div class="metric-card">
-            <span class="metric-label">Показы</span>
-            <strong class="metric-number">{{ dashboard.gsc_summary.impressions }}</strong>
-            <p>Показы сайта в Google</p>
+    <div class="realtime-search-card">
+        <div class="realtime-updated">{{ dashboard.tracker_analytics.realtime_search.updated_label }}</div>
+
+        <div class="search-console-metrics">
+            {% for item in dashboard.tracker_analytics.realtime_search.summary %}
+            <div class="search-console-metric {{ 'is-disabled' if item.disabled }}" style="--metric-color: {{ item.color }}">
+                <div class="search-console-metric-title">
+                    <input type="checkbox" checked disabled>
+                    <span>{{ item.label }}</span>
+                    <details class="info-popover metric-info-popover">
+                        <summary aria-label="Информация о метрике">i</summary>
+                        <div>{{ item.info }}</div>
+                    </details>
+                </div>
+                <strong>{{ item.value }}</strong>
+            </div>
+            {% endfor %}
         </div>
-        <div class="metric-card">
-            <span class="metric-label">Клики</span>
-            <strong class="metric-number">{{ dashboard.gsc_summary.clicks }}</strong>
-            <p>Переходы из поиска</p>
+
+        <div class="realtime-chart-tools">
+            <div class="metric-toggle-row" data-chart-toggles>
+                {% for series in dashboard.tracker_analytics.realtime_search.series %}
+                <label class="metric-toggle {{ 'is-disabled' if series.disabled }}" style="--metric-color: {{ series.color }}">
+                    <input type="checkbox" value="{{ series.key }}" {{ 'checked' if not series.disabled }} {{ 'disabled' if series.disabled }}>
+                    <span>{{ series.label }}</span>
+                    {% if series.disabled and series.message %}
+                    <span class="toggle-hint">{{ series.message }}</span>
+                    {% endif %}
+                </label>
+                {% endfor %}
+            </div>
+            <span class="granularity-pill">
+                {{ 'Каждый час' if dashboard.tracker_analytics.realtime_search.granularity == 'hourly' else 'Каждый день' }}
+            </span>
         </div>
-        <div class="metric-card">
-            <span class="metric-label">CTR</span>
-            <strong class="metric-number">{{ "%.2f"|format(dashboard.gsc_summary.ctr * 100) }}%</strong>
-            <p>Доля кликов от показов</p>
+
+        <div class="chart-shell realtime-chart-shell">
+            <canvas id="realtimeSearchChart" data-chart='{{ dashboard.tracker_analytics.realtime_search | tojson }}' width="1200" height="420"></canvas>
+            <div id="realtimeSearchChartEmpty" class="chart-empty" style="display:none;">
+                Пока недостаточно realtime-данных для графика.
+            </div>
         </div>
-        <div class="metric-card">
-            <span class="metric-label">Позиция</span>
-            <strong class="metric-number">{{ "%.1f"|format(dashboard.gsc_summary.position) }}</strong>
-            <p>Среднее место в выдаче</p>
+
+        <div class="realtime-tabs">
+            {% for tab in dashboard.tracker_analytics.realtime_search.tabs %}
+            <input type="radio" id="realtime-tab-{{ tab.key }}" name="realtime-tabs" {{ 'checked' if loop.first }}>
+            <label for="realtime-tab-{{ tab.key }}">{{ tab.label }}</label>
+            {% endfor %}
+
+            {% for tab in dashboard.tracker_analytics.realtime_search.tabs %}
+            <div class="realtime-tab-panel realtime-tab-panel-{{ loop.index }}">
+                <div class="realtime-table-head">
+                    <span>{{ tab.label }}</span>
+                    <span>Клики</span>
+                    <span>{{ tab.metric_label }}</span>
+                    <span>CTR</span>
+                    <span>Позиция</span>
+                </div>
+                {% if tab.rows %}
+                    {% for row in tab.rows %}
+                    <div class="realtime-table-row">
+                        <span>{{ row.primary }}</span>
+                        <strong>{{ row.clicks }}</strong>
+                        <strong>{{ row.impressions }}</strong>
+                        <strong>{{ row.ctr or '-' }}</strong>
+                        <strong>{{ row.position or '-' }}</strong>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="realtime-empty-row">{{ tab.empty }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
         </div>
     </div>
 </section>
+{% endif %}
 
 <section class="section">
     <div class="section-heading">
@@ -204,6 +264,7 @@
             {% if result.error %}
             <strong class="metric-number">-</strong>
             <p>{{ result.error }}</p>
+            <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
             {% else %}
             <strong class="metric-number">{{ "%.0f"|format(result.performance_score or 0) }}</strong>
             <p>Performance</p>
@@ -212,6 +273,7 @@
                 <div><span>Best Practices</span><strong>{{ "%.0f"|format(result.best_practices_score or 0) }}</strong></div>
                 <div><span>SEO</span><strong>{{ "%.0f"|format(result.seo_score or 0) }}</strong></div>
             </div>
+            <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
             {% endif %}
         </div>
         {% endfor %}

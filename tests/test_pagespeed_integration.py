@@ -65,7 +65,20 @@ class PageSpeedSourceTests(unittest.TestCase):
 
         self.assertIn("PageSpeed Insights", dashboard_source)
         self.assertIn('action="/sites/{{ site.site_id }}/pagespeed/run"', dashboard_source)
+        self.assertIn('/pagespeed/{{ strategy }}', dashboard_source)
         self.assertIn('@router.post("/sites/{site_id}/pagespeed/run")', route_source)
+        self.assertIn('@router.get("/sites/{site_id}/pagespeed/{strategy}")', route_source)
         self.assertIn("PageSpeedService(db).run_pagespeed", route_source)
+        self.assertIn("_build_pagespeed_detail(result)", route_source)
         self.assertIn("PAGESPEED INSIGHTS", ai_report_source)
         self.assertIn("pagespeed_service.get_ai_context", ai_report_source)
+
+    def test_pagespeed_detail_template_exists(self):
+        template_source = Path("app/templates/user_pagespeed_detail.html").read_text(encoding="utf-8")
+
+        self.assertIn('{% extends "user_base.html" %}', template_source)
+        self.assertIn("Что хорошо", template_source)
+        self.assertIn("Что плохо / требует внимания", template_source)
+        self.assertIn("Core Web Vitals", template_source)
+        self.assertIn("Рекомендации Lighthouse", template_source)
+        self.assertIn("Ошибка проверки", template_source)

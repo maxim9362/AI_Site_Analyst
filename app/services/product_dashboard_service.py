@@ -59,8 +59,24 @@ class ProductDashboardService:
         gsc_time_series = await self.gsc_service.get_gsc_time_series(public_site_id, period_option["value"])
         latest_report = await self.report_repository.get_latest_report_by_site(site.id)
         pagespeed = await self.pagespeed_service.get_latest_by_site(public_site_id)
+        gsc_connected = bool(gsc_summary and gsc_summary.get("is_connected"))
 
-        chart_data = await self._build_chart_data(site.id, period_option, gsc_time_series or [], gsc_connected=bool(gsc_summary and gsc_summary.get("is_connected")))
+        chart_data = await self._build_chart_data(site.id, period_option, gsc_time_series or [], gsc_connected=gsc_connected)
+        gsc_chart_data = self._build_gsc_chart_data(
+            period_option,
+            gsc_time_series or [],
+            gsc_summary or {},
+            gsc_connected=gsc_connected,
+        )
+        if simple_analytics and simple_analytics.get("realtime_search"):
+            simple_analytics["realtime_search"] = self._merge_gsc_into_realtime_search(
+                simple_analytics["realtime_search"],
+                period_option,
+                gsc_summary or {},
+                gsc_time_series or [],
+                gsc_top_queries or [],
+                gsc_connected=gsc_connected,
+            )
         technical_counts = await self._build_technical_counts(site.id)
         site_score = await calculate_site_score(self.session, public_site_id, period_option["value"])
         ai_insights = self._extract_ai_insights(latest_report)
@@ -83,7 +99,8 @@ class ProductDashboardService:
             },
             "gsc_top_queries": gsc_top_queries or [],
             "gsc_time_series": gsc_time_series or [],
-            "gsc_connected": bool(gsc_summary and gsc_summary.get("is_connected")),
+            "gsc_connected": gsc_connected,
+            "gsc_chart_data": gsc_chart_data,
             "pagespeed": pagespeed,
             "chart_data": chart_data,
             "latest_ai_report": latest_report,
@@ -123,6 +140,8 @@ class ProductDashboardService:
 
         visits_by_bucket = Counter()
         for event in events:
+            if getattr(event, "is_bot", False):
+                continue
             if event.event_type == "pageview" and event.created_at:
                 bucket = bucket_fn(event)
                 if bucket:
@@ -187,6 +206,173 @@ class ProductDashboardService:
                 },
             ],
         }
+
+    def _build_gsc_chart_data(
+        self,
+        period_option: dict[str, Any],
+        gsc_time_series: list[dict[str, Any]],
+        gsc_summary: dict[str, Any],
+        gsc_connected: bool = False,
+    ) -> dict[str, Any]:
+        days = period_option["days"]
+        is_hourly = days <= 1
+        labels = self._build_hourly_labels() if is_hourly else self._build_labels(days)
+        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected else {}
+        latest_point = gsc_time_series[-1] if gsc_time_series else {}
+        disabled = not gsc_connected
+        message = "" if gsc_connected else "Google Search Console пока не подключен или данных за период нет."
+        note = (
+            "Search Console обновляет SEO-данные по дням. В периоде 24 часа график показывает последний доступный дневной срез на почасовой шкале."
+            if is_hourly
+            else "Каждая точка на графике соответствует одному дню выбранного периода."
+        )
+
+        def values_for(key: str) -> list[float | int | None]:
+            if disabled:
+                return []
+            if is_hourly:
+                value = latest_point.get(key)
+                if key == "ctr":
+                    return [self._format_ctr(value) for _ in labels]
+                return [value for _ in labels]
+            if key == "ctr":
+                return [self._format_ctr(gsc_by_day.get(label, {}).get("ctr")) for label in labels]
+            return [gsc_by_day.get(label, {}).get(key) for label in labels]
+
+        return {
+            "labels": labels,
+            "message": message,
+            "note": note,
+            "granularity": "hourly" if is_hourly else "daily",
+            "summary": [
+                {"label": "Показы", "value": int(gsc_summary.get("impressions") or 0), "color": "#16a34a"},
+                {"label": "Клики", "value": int(gsc_summary.get("clicks") or 0), "color": "#2563eb"},
+                {"label": "CTR", "value": f"{float(gsc_summary.get('ctr') or 0) * 100:.2f}%", "color": "#f59e0b"},
+                {"label": "Позиция", "value": f"{float(gsc_summary.get('position') or 0):.1f}", "color": "#7c3aed"},
+            ],
+            "series": [
+                {
+                    "key": "impressions",
+                    "label": "Показы",
+                    "color": "#16a34a",
+                    "disabled": disabled,
+                    "values": values_for("impressions"),
+                },
+                {
+                    "key": "clicks",
+                    "label": "Клики",
+                    "color": "#2563eb",
+                    "disabled": disabled,
+                    "values": values_for("clicks"),
+                },
+                {
+                    "key": "ctr",
+                    "label": "CTR",
+                    "color": "#f59e0b",
+                    "disabled": disabled,
+                    "values": values_for("ctr"),
+                },
+                {
+                    "key": "position",
+                    "label": "Позиция",
+                    "color": "#7c3aed",
+                    "disabled": disabled,
+                    "values": values_for("position"),
+                },
+            ],
+        }
+
+    def _merge_gsc_into_realtime_search(
+        self,
+        realtime_search: dict[str, Any],
+        period_option: dict[str, Any],
+        gsc_summary: dict[str, Any],
+        gsc_time_series: list[dict[str, Any]],
+        gsc_top_queries: list[dict[str, Any]],
+        gsc_connected: bool = False,
+    ) -> dict[str, Any]:
+        labels = realtime_search.get("labels", [])
+        is_hourly = period_option["days"] <= 1
+        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected else {}
+        latest_point = gsc_time_series[-1] if gsc_time_series else {}
+        disabled = not gsc_connected
+        message = "" if gsc_connected else "Google Search Console пока не подключен или данных за период нет."
+
+        def values_for(key: str) -> list[float | int | None]:
+            if disabled:
+                return []
+            if is_hourly:
+                value = latest_point.get(key)
+                if key == "ctr":
+                    return [self._format_ctr(value) for _ in labels]
+                return [value for _ in labels]
+            if key == "ctr":
+                return [self._format_ctr(gsc_by_day.get(label, {}).get("ctr")) for label in labels]
+            return [gsc_by_day.get(label, {}).get(key) for label in labels]
+
+        merged = dict(realtime_search)
+        merged["source_note"] = (
+            "Наши события обновляются сразу. Google Search Console добавляется в этот же график после синхронизации."
+        )
+        merged["summary"] = list(realtime_search.get("summary", [])) + [
+            {
+                "label": "Показы Google",
+                "value": int(gsc_summary.get("impressions") or 0),
+                "color": "#7e22ce",
+                "disabled": disabled,
+                "info": "Сколько раз сайт был показан пользователям в результатах поиска Google.",
+            },
+            {
+                "label": "Клики Google",
+                "value": int(gsc_summary.get("clicks") or 0),
+                "color": "#1a73e8",
+                "disabled": disabled,
+                "info": "Сколько переходов на сайт пришло из результатов поиска Google.",
+            },
+            {
+                "label": "CTR Google",
+                "value": f"{float(gsc_summary.get('ctr') or 0) * 100:.2f}%",
+                "color": "#f59e0b",
+                "disabled": disabled,
+                "info": "Доля переходов от показов в Google: клики делятся на показы.",
+            },
+            {
+                "label": "Позиция Google",
+                "value": f"{float(gsc_summary.get('position') or 0):.1f}",
+                "color": "#7c3aed",
+                "disabled": disabled,
+                "info": "Среднее место сайта в выдаче Google. Чем меньше число, тем выше сайт.",
+            },
+        ]
+        merged["series"] = list(realtime_search.get("series", [])) + [
+            {"key": "google_impressions", "label": "Показы Google", "color": "#7e22ce", "disabled": disabled, "message": message, "values": values_for("impressions")},
+            {"key": "google_clicks", "label": "Клики Google", "color": "#1a73e8", "disabled": disabled, "message": message, "values": values_for("clicks")},
+            {"key": "google_ctr", "label": "CTR Google", "color": "#f59e0b", "disabled": disabled, "message": message, "values": values_for("ctr")},
+            {"key": "google_position", "label": "Позиция Google", "color": "#7c3aed", "disabled": disabled, "message": message, "values": values_for("position")},
+        ]
+
+        gsc_query_rows = [
+            {
+                "primary": query.get("query") or "Без запроса",
+                "clicks": int(query.get("clicks") or 0),
+                "impressions": int(query.get("impressions") or 0),
+                "ctr": f"{float(query.get('ctr') or 0) * 100:.2f}%",
+                "position": f"{float(query.get('position') or 0):.1f}",
+            }
+            for query in gsc_top_queries
+        ]
+        tabs = []
+        for tab in realtime_search.get("tabs", []):
+            tab_copy = dict(tab)
+            if tab_copy.get("key") == "queries":
+                tab_copy["metric_label"] = "Показы"
+                tab_copy["rows"] = gsc_query_rows or tab_copy.get("rows", [])
+                tab_copy["empty"] = (
+                    "Запросы появятся после синхронизации Google Search Console или если поисковик передаст query в referrer."
+                )
+            tabs.append(tab_copy)
+        merged["tabs"] = tabs
+        return merged
 
     def _build_hourly_labels(self) -> list[str]:
         now = datetime.now(timezone.utc)
