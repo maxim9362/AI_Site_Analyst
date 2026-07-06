@@ -13,6 +13,8 @@ from app.repositories.site_repository import SiteRepository
 from app.schemas.ai_report import AIReportRead
 from app.services.ai_service import ai_service
 from app.services.analytics_service import AnalyticsService
+from app.services.gsc_service import GSCService
+from app.services.pagespeed_service import PageSpeedService
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,45 @@ class AIReportService:
         self.classification_repository = BlockClassificationRepository(session)
         self.snapshot_repository = PageSnapshotRepository(session)
         self.analytics_service = AnalyticsService(session)
+        self.gsc_service = GSCService(session)
+        self.pagespeed_service = PageSpeedService(session)
 
-    def _build_context(self, analytics: dict, chunks: list, classifications: list, snapshots: list) -> str:
+    def _build_context(
+        self,
+        analytics: dict,
+        chunks: list,
+        classifications: list,
+        snapshots: list,
+        gsc_data: dict,
+        pagespeed_data: dict,
+    ) -> str:
+        # Контекст собирается только из фактов: аналитика, тексты сайта, классификации, снимки и GSC.
         parts = []
 
         parts.append("=== АНАЛИТИКА САЙТА ===")
         parts.append(json.dumps(analytics, ensure_ascii=False, default=str)[:3000])
 
+        parts.append("\n=== GOOGLE SEARCH CONSOLE ===")
+        if gsc_data.get("summary", {}).get("is_connected"):
+            parts.append(json.dumps({"google_search_console": gsc_data}, ensure_ascii=False, default=str)[:3000])
+            parts.append(
+                "Если Search Console данные есть, анализируй SEO-показы, клики, CTR, позиции и запросы вместе с поведением пользователей на сайте."
+            )
+        else:
+            parts.append("Google Search Console data is not connected.")
+            parts.append("Если Search Console данных нет, не делай выводы про позиции, показы, CTR или SEO-запросы.")
+
+        parts.append("\n=== PAGESPEED INSIGHTS ===")
+        if pagespeed_data:
+            parts.append(json.dumps({"pagespeed": pagespeed_data}, ensure_ascii=False, default=str)[:3000])
+            parts.append(
+                "Если PageSpeed данные есть, анализируй скорость, Core Web Vitals, accessibility, best practices и технические SEO-проблемы вместе с поведением пользователей."
+            )
+        else:
+            parts.append("PageSpeed Insights data is not collected yet.")
+
         if chunks:
-            parts.append("\n=== ТЕКСТЫ САЙТА (KNOWLEDGE CHUNKS) ===")
+            parts.append("\n=== ТЕКСТЫ САЙТА ===")
             chunks_text = ""
             for chunk in chunks[:20]:
                 chunks_text += f"[{chunk.chunk_type}] {chunk.title}: {chunk.content[:200]}\n"
@@ -55,8 +87,8 @@ class AIReportService:
             for snap in snapshots[:5]:
                 snap_text += f"Страница: {snap.path} ({snap.title})\n"
                 if snap.headings:
-                    for h in snap.headings[:5]:
-                        snap_text += f"  - {h.get('tag', 'h1')}: {h.get('text', '')}\n"
+                    for heading in snap.headings[:5]:
+                        snap_text += f"  - {heading.get('tag', 'h1')}: {heading.get('text', '')}\n"
             parts.append(snap_text[:2000])
 
         context = "\n".join(parts)
@@ -65,6 +97,13 @@ class AIReportService:
             context = context[:self.MAX_CONTEXT_LENGTH]
 
         return context
+
+    def _gsc_period_from_days(self, days: int) -> str:
+        if days <= 1:
+            return "24h"
+        if days > 7:
+            return "30d"
+        return "7d"
 
     async def generate_site_report(self, public_site_id: str, report_type: str = "manual", days: int = 7) -> AIReportRead | None:
         site = await self.site_repository.get_site_by_site_id(public_site_id)
@@ -75,12 +114,18 @@ class AIReportService:
         period_start = period_end - timedelta(days=days)
 
         analytics = await self.analytics_service.get_site_analytics_summary(public_site_id, period_start, period_end)
-
         chunks = await self.knowledge_repository.list_chunks_by_site(site.id, limit=20)
         classifications = await self.classification_repository.list_classifications_by_site(site.id, limit=15)
         snapshots = await self.snapshot_repository.list_recent_snapshots_by_site(site.id, limit=5)
 
-        context = self._build_context(analytics, chunks, classifications, snapshots)
+        gsc_period = self._gsc_period_from_days(days)
+        gsc_data = {
+            "summary": await self.gsc_service.get_gsc_summary(public_site_id, gsc_period),
+            "top_queries": await self.gsc_service.get_gsc_top_queries(public_site_id, gsc_period),
+            "time_series": await self.gsc_service.get_gsc_time_series(public_site_id, gsc_period),
+        }
+        pagespeed_data = await self.pagespeed_service.get_ai_context(public_site_id)
+        context = self._build_context(analytics, chunks, classifications, snapshots, gsc_data, pagespeed_data)
 
         logger.info(f"Generating AI report for site {public_site_id} ({report_type}, {days} days)")
 

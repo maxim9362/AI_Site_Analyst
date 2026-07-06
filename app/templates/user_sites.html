@@ -1,0 +1,62 @@
+{% extends "user_base.html" %}
+
+{% block title %}Все сайты - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Все сайты</h1>
+        <p>Сайты, подключенные к вашему аккаунту.</p>
+    </div>
+    <a class="btn btn-primary" href="/sites/new">Привязать сайт</a>
+</div>
+
+{% if sites %}
+<div class="table-container">
+    <table>
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>Домен</th>
+                <th>Site ID</th>
+                <th>Google API</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for site in sites %}
+            <tr>
+                <td><a class="back-link" href="/sites/{{ site.site_id }}">{{ site.name }}</a></td>
+                <td>{{ site.domain }}</td>
+                <td><code>{{ site.site_id }}</code></td>
+                <td>
+                    {% if site.google_client_id %}
+                    <span class="status status-active">Подключен</span>
+                    {% else %}
+                    <span class="status status-inactive">Не задан</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if site.is_active %}
+                    <span class="status status-active">Активен</span>
+                    {% else %}
+                    <span class="status status-inactive">Отключен</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a class="btn btn-small" href="/sites/{{ site.site_id }}">Открыть</a>
+                    <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <p>Пока нет подключенных сайтов.</p>
+    <a class="btn btn-primary" href="/sites/new">Привязать первый сайт</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}AI Site Analyst{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/sites">AI Site Analyst</a>
+        </div>
+        <div class="nav-links">
+            <a href="/sites">Все сайты</a>
+            <a href="/sites/new">Привязать сайт</a>
+            <a href="/logout">Выйти</a>
+        </div>
+    </nav>
+    <main class="container">
+        {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

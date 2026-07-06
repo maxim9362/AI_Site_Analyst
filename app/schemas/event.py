@@ -30,4 +30,9 @@ class EventRead(BaseModel):
     title: str
     referrer: str | None = None
     event_metadata: dict | None = None
+    user_agent: str | None = None
+    ip_address: str | None = None
+    is_bot: bool = False
+    bot_name: str | None = None
+    bot_category: str | None = None
     created_at: datetime

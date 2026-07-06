@@ -9,6 +9,46 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.site_repository import SiteRepository
 
 
+def _build_timeseries(
+    events: list[Event],
+    days: int,
+) -> dict[str, Any]:
+    """Строит time series для графика: labels + site_visits + pageviews."""
+    period_end = datetime.now(timezone.utc)
+
+    if days <= 1:
+        # 24h — labels по часам (последние 24 часа UTC).
+        period_start = period_end - timedelta(hours=24)
+        labels = [
+            (period_end - timedelta(hours=offset)).strftime("%H:00")
+            for offset in reversed(range(24))
+        ]
+        bucket_fn = lambda e: e.created_at.strftime("%H:00") if e.created_at else None
+    else:
+        # 7d / 30d — labels по дням.
+        period_start = period_end - timedelta(days=days)
+        labels = [
+            (period_end - timedelta(days=offset)).date().isoformat()
+            for offset in reversed(range(days))
+        ]
+        bucket_fn = lambda e: e.created_at.date().isoformat() if e.created_at else None
+
+    pageview_events = [e for e in events if e.event_type == "pageview"]
+
+    visits_by_bucket = Counter()
+    for event in pageview_events:
+        bucket = bucket_fn(event)
+        if bucket:
+            visits_by_bucket[bucket] += 1
+
+    # В MVP pageview = site visit (один pageview = один визит на страницу).
+    return {
+        "labels": labels,
+        "site_visits": [visits_by_bucket.get(label, 0) for label in labels],
+        "pageviews": [visits_by_bucket.get(label, 0) for label in labels],
+    }
+
+
 def _normalize_days(days: int) -> int:
     # Период ограничен для MVP, чтобы случайно не загрузить слишком большой объем событий.
     if days < 1:
@@ -45,8 +85,9 @@ def _empty_analytics(days: int, message: str) -> dict[str, Any]:
             "whatsapp": 0,
             "phone": 0,
             "email": 0,
-            "forms": 0,
             "cta": 0,
+            "form_starts": 0,
+            "form_submits": 0,
             "total": 0,
         },
         "funnel": {
@@ -54,7 +95,15 @@ def _empty_analytics(days: int, message: str) -> dict[str, Any]:
             "viewed_services": 0,
             "viewed_pricing": 0,
             "contact_actions": 0,
+            "form_starts": 0,
             "form_submits": 0,
+        },
+        "bots": {
+            "total_events": 0,
+            "unique_bots": 0,
+            "unique_sessions": 0,
+            "known_bots": [],
+            "top_user_agents": [],
         },
     }
 
@@ -172,6 +221,38 @@ def _build_scroll_stats(scroll_events: list[Event]) -> dict[str, int]:
     return scroll_stats
 
 
+def _is_bot_event(event: Event) -> bool:
+    return bool(getattr(event, "is_bot", False))
+
+
+def _build_bot_stats(bot_events: list[Event]) -> dict[str, Any]:
+    bot_names: Counter[tuple[str, str]] = Counter()
+    user_agents: Counter[str] = Counter()
+
+    for event in bot_events:
+        bot_name = getattr(event, "bot_name", None) or "Unknown bot"
+        bot_category = getattr(event, "bot_category", None) or "unknown"
+        bot_names[(bot_name, bot_category)] += 1
+
+        user_agent = (getattr(event, "user_agent", None) or "").strip()
+        if user_agent:
+            user_agents[user_agent[:180]] += 1
+
+    return {
+        "total_events": len(bot_events),
+        "unique_bots": len({event.visitor_id for event in bot_events if event.visitor_id}),
+        "unique_sessions": len({event.session_id for event in bot_events if event.session_id}),
+        "known_bots": [
+            {"name": name, "category": category, "events": count}
+            for (name, category), count in bot_names.most_common(5)
+        ],
+        "top_user_agents": [
+            {"user_agent": user_agent, "events": count}
+            for user_agent, count in user_agents.most_common(3)
+        ],
+    }
+
+
 async def get_simple_site_analytics(
     db: AsyncSession,
     public_site_id: str,
@@ -189,27 +270,47 @@ async def get_simple_site_analytics(
     events = await event_repository.get_events_by_period(site.id, period_start, period_end)
 
     if not events:
-        return _empty_analytics(
+        empty = _empty_analytics(
             days,
             "Пока недостаточно данных. Система собирает аналитику.",
         )
+        empty["timeseries"] = {"labels": [], "site_visits": [], "pageviews": []}
+        return empty
+
+    human_events = [event for event in events if not _is_bot_event(event)]
+    bot_events = [event for event in events if _is_bot_event(event)]
 
     # Для production тяжелые агрегации лучше перенести в SQL-запросы или materialized summaries.
-    pageview_events = [event for event in events if event.event_type == "pageview"]
-    click_events = [event for event in events if event.event_type == "click"]
-    scroll_events = [event for event in events if event.event_type == "scroll"]
-    form_events = [event for event in events if event.event_type == "form_submit"]
+    pageview_events = [event for event in human_events if event.event_type == "pageview"]
+    click_events = [event for event in human_events if event.event_type == "click"]
+    scroll_events = [event for event in human_events if event.event_type == "scroll"]
+    form_submit_events = [event for event in human_events if event.event_type == "form_submit"]
+    form_start_events = [event for event in human_events if event.event_type == "form_start"]
+    goal_events = [event for event in human_events if event.event_type == "goal"]
 
-    unique_visitors = len({event.visitor_id for event in events if event.visitor_id})
-    unique_sessions = len({event.session_id for event in events if event.session_id})
+    unique_visitors = len({event.visitor_id for event in human_events if event.visitor_id})
+    unique_sessions = len({event.session_id for event in human_events if event.session_id})
     click_labels = Counter(_click_label(event) for event in click_events)
 
-    whatsapp = sum(1 for event in click_events if _is_whatsapp(event))
-    phone = sum(1 for event in click_events if _is_phone(event))
-    email = sum(1 for event in click_events if _is_email(event))
-    forms = len(form_events)
-    cta = sum(1 for event in click_events if _is_cta(event))
-    goals_total = whatsapp + phone + email + forms + cta
+    # Подсчет целей: сначала из goal events (tracker v2), затем fallback на click events.
+    goal_counts = {"whatsapp": 0, "phone": 0, "email": 0, "cta": 0}
+    for event in goal_events:
+        meta = _metadata(event)
+        goal_type = _lower_value(meta.get("goal_type"))
+        if goal_type in goal_counts:
+            goal_counts[goal_type] += 1
+
+    # Fallback: если goal events нет, считаем по click events (обратная совместимость).
+    if not goal_events:
+        goal_counts["whatsapp"] = sum(1 for event in click_events if _is_whatsapp(event))
+        goal_counts["phone"] = sum(1 for event in click_events if _is_phone(event))
+        goal_counts["email"] = sum(1 for event in click_events if _is_email(event))
+        goal_counts["cta"] = sum(1 for event in click_events if _is_cta(event))
+
+    form_starts = len(form_start_events)
+    form_submits = len(form_submit_events)
+    contact_actions = goal_counts["whatsapp"] + goal_counts["phone"] + goal_counts["email"] + goal_counts["cta"]
+    goals_total = contact_actions + form_starts + form_submits
 
     return {
         "period_days": days,
@@ -231,19 +332,22 @@ async def get_simple_site_analytics(
             ],
         },
         "goals": {
-            "whatsapp": whatsapp,
-            "phone": phone,
-            "email": email,
-            "forms": forms,
-            "cta": cta,
-            # В MVP один клик может попасть в несколько целевых категорий, поэтому total является суммой сигналов.
+            "whatsapp": goal_counts["whatsapp"],
+            "phone": goal_counts["phone"],
+            "email": goal_counts["email"],
+            "cta": goal_counts["cta"],
+            "form_starts": form_starts,
+            "form_submits": form_submits,
             "total": goals_total,
         },
         "funnel": {
             "site_visits": len(pageview_events),
             "viewed_services": sum(1 for event in pageview_events if _is_services_page(event)),
             "viewed_pricing": sum(1 for event in pageview_events if _is_pricing_page(event)),
-            "contact_actions": whatsapp + phone + email + cta,
-            "form_submits": forms,
+            "contact_actions": contact_actions,
+            "form_starts": form_starts,
+            "form_submits": form_submits,
         },
+        "timeseries": _build_timeseries(human_events, days),
+        "bots": _build_bot_stats(bot_events),
     }

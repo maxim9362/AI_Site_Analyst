@@ -1,5 +1,6 @@
 fastapi
 uvicorn[standard]
+python-multipart
 sqlalchemy[asyncio]
 asyncpg
 alembic
@@ -8,3 +9,7 @@ pydantic-settings
 python-dotenv
 jinja2
 google-generativeai
+google-auth
+google-auth-oauthlib
+google-api-python-client
+cryptography

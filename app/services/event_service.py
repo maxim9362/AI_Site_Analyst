@@ -13,6 +13,7 @@ from app.core.constants import (
     TRACKER_MAX_SESSION_ID_LENGTH,
     VALID_EVENT_TYPES,
 )
+from app.core.bot_detection import detect_bot
 from app.repositories.event_repository import EventRepository
 from app.repositories.site_repository import SiteRepository
 from app.schemas.event import EventCreate, EventRead
@@ -53,7 +54,12 @@ class EventService:
 
         return data
 
-    async def create_event(self, data: EventCreate) -> EventRead | None:
+    async def create_event(
+        self,
+        data: EventCreate,
+        user_agent: str | None = None,
+        ip_address: str | None = None,
+    ) -> EventRead | None:
         validated = self._validate_and_sanitize(data)
         if not validated:
             return None
@@ -70,6 +76,7 @@ class EventService:
             if event_domain and event_domain not in site.allowed_domains:
                 return None
 
+        bot_info = detect_bot(user_agent)
         event_data = {
             "site_id": site.id,
             "public_site_id": validated.site_id,
@@ -81,6 +88,11 @@ class EventService:
             "title": validated.title,
             "referrer": validated.referrer,
             "event_metadata": validated.metadata,
+            "user_agent": user_agent,
+            "ip_address": ip_address,
+            "is_bot": bot_info["is_bot"],
+            "bot_name": bot_info["bot_name"],
+            "bot_category": bot_info["bot_category"],
         }
 
         try:

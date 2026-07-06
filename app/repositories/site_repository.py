@@ -11,8 +11,23 @@ class SiteRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def create_site(self, client_id: uuid.UUID, site_id: str, data: SiteCreate) -> Site:
-        site = Site(client_id=client_id, site_id=site_id, **data.model_dump())
+    async def create_site(
+        self,
+        client_id: uuid.UUID,
+        site_id: str,
+        data: SiteCreate,
+        user_id: uuid.UUID | None = None,
+        google_client_id: str | None = None,
+        google_client_secret: str | None = None,
+    ) -> Site:
+        site = Site(
+            client_id=client_id,
+            user_id=user_id,
+            site_id=site_id,
+            google_client_id=google_client_id,
+            google_client_secret=google_client_secret,
+            **data.model_dump(),
+        )
         self.session.add(site)
         await self.session.commit()
         await self.session.refresh(site)
@@ -26,6 +41,14 @@ class SiteRepository:
         result = await self.session.execute(select(Site).where(Site.site_id == site_id))
         return result.scalar_one_or_none()
 
+    async def get_site_by_site_id_and_user(self, site_id: str, user_id: uuid.UUID) -> Site | None:
+        result = await self.session.execute(select(Site).where(Site.site_id == site_id, Site.user_id == user_id))
+        return result.scalar_one_or_none()
+
     async def list_sites_by_client(self, client_id: uuid.UUID) -> list[Site]:
         result = await self.session.execute(select(Site).where(Site.client_id == client_id))
+        return list(result.scalars().all())
+
+    async def list_sites_by_user(self, user_id: uuid.UUID) -> list[Site]:
+        result = await self.session.execute(select(Site).where(Site.user_id == user_id).order_by(Site.created_at.desc()))
         return list(result.scalars().all())

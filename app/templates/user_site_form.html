@@ -1,0 +1,40 @@
+{% extends "user_base.html" %}
+
+{% block title %}Привязать сайт - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Привязать сайт</h1>
+        <p>Добавьте сайт в аккаунт. Google API-ключи подключим на следующем шаге.</p>
+    </div>
+    <a class="btn btn-secondary" href="/sites">Все сайты</a>
+</div>
+
+<div class="login-card">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    <form method="POST" action="/sites/new">
+        <div class="form-group">
+            <label for="name">Название сайта</label>
+            <input type="text" id="name" name="name" value="{{ name }}" required>
+        </div>
+        <div class="form-group">
+            <label for="domain">Основной домен</label>
+            <input type="text" id="domain" name="domain" value="{{ domain }}" placeholder="example.com" required>
+        </div>
+        <div class="form-group">
+            <label for="allowed_domains">Разрешенные домены</label>
+            <textarea id="allowed_domains" name="allowed_domains" rows="4" placeholder="example.com&#10;www.example.com">{{ allowed_domains }}</textarea>
+        </div>
+        <div class="form-group">
+            <label for="google_client_id">GOOGLE_CLIENT_ID</label>
+            <input type="text" id="google_client_id" name="google_client_id" value="{{ google_client_id }}" required>
+        </div>
+        <div class="form-group">
+            <label for="google_client_secret">GOOGLE_CLIENT_SECRET</label>
+            <input type="password" id="google_client_secret" name="google_client_secret" value="{{ google_client_secret }}" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Сохранить сайт</button>
+    </form>
+</div>
+{% endblock %}

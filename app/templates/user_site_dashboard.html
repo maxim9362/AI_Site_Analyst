@@ -1,0 +1,255 @@
+{% extends "user_base.html" %}
+
+{% block title %}{{ site.name }} - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="product-header">
+    <div>
+        <a href="/sites" class="back-link">Все сайты</a>
+        <h1>{{ site.name }}</h1>
+        <p>{{ site.domain }}</p>
+    </div>
+    <div class="product-header-meta">
+        <span>Site ID</span>
+        <code>{{ site.site_id }}</code>
+        <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код подключения</a>
+    </div>
+</div>
+
+<section class="section">
+    <div class="period-switcher" aria-label="Период">
+        {% for option in dashboard.period_options %}
+        <a href="/sites/{{ site.site_id }}?period={{ option.value }}" class="{{ 'is-active' if option.value == dashboard.period else '' }}">
+            {{ option.label }}
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+{% if dashboard.site_score and not dashboard.site_score.error %}
+<section class="section">
+    <div class="score-card">
+        <div class="score-main">
+            {% if dashboard.site_score.overall_score is not none %}
+            <div class="score-number">{{ dashboard.site_score.overall_score }}<span class="score-total">/100</span></div>
+            {% else %}
+            <div class="score-number score-no-data">-<span class="score-total">/100</span></div>
+            {% endif %}
+            <div class="score-info">
+                <div class="section-title-row">
+                    <span class="score-label-text">{{ dashboard.site_score.label }}</span>
+                    <details class="info-popover">
+                        <summary aria-label="Информация о блоке">i</summary>
+                        <div>Общая оценка сайта по данным поведения, SEO, технического состояния и готовности к анализу.</div>
+                    </details>
+                </div>
+                <p>{{ dashboard.site_score.message }}</p>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if dashboard.site_status %}
+<section class="section">
+    <div class="status-card status-{{ dashboard.site_status.status }}">
+        <div class="status-card-main">
+            <div class="section-title-row">
+                <span class="section-kicker">Статус сайта</span>
+                <details class="info-popover">
+                    <summary aria-label="Информация о блоке">i</summary>
+                    <div>Показывает, хватает ли данных для анализа: установлен ли код, есть ли события, снимки страниц и отчеты.</div>
+                </details>
+            </div>
+            <strong>{{ dashboard.site_status.status_label }}</strong>
+            <p>{{ dashboard.site_status.message }}</p>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% if dashboard.tracker_analytics %}
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">Аналитика</span>
+        <div class="section-title-row">
+            <h2>Что делают посетители</h2>
+            <details class="info-popover">
+                <summary aria-label="Информация о блоке">i</summary>
+                <div>Данные собираются JS-кодом на сайте: визиты, просмотры, клики, цели и действия с формами.</div>
+            </details>
+        </div>
+        <p>{{ dashboard.tracker_analytics.message }}</p>
+    </div>
+
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Посетители</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.visitors.unique_visitors }}</strong>
+            <p>Сессий: {{ dashboard.tracker_analytics.visitors.unique_sessions }}</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Просмотры</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.pageviews.total }}</strong>
+            <p>Всего просмотров страниц</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Клики</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.clicks.total }}</strong>
+            <p>Нажатия по кнопкам и ссылкам</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Цели</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.goals.total }}</strong>
+            <p>WhatsApp, телефон, email, CTA, формы</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Боты</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.bots.unique_bots }}</strong>
+            <p>Событий: {{ dashboard.tracker_analytics.bots.total_events }}</p>
+        </div>
+    </div>
+
+    {% if dashboard.tracker_analytics.bots.known_bots %}
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Информация о ботах</span>
+            <div class="metric-list">
+                {% for bot in dashboard.tracker_analytics.bots.known_bots %}
+                <div><span>{{ bot.name }} · {{ bot.category }}</span><strong>{{ bot.events }}</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% if dashboard.tracker_analytics.bots.top_user_agents %}
+        <div class="metric-card">
+            <span class="metric-label">User-Agent</span>
+            <div class="metric-list">
+                {% for agent in dashboard.tracker_analytics.bots.top_user_agents %}
+                <div><span>{{ agent.user_agent }}</span><strong>{{ agent.events }}</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">Google Search Console</span>
+        <div class="section-title-row">
+            <h2>Поиск Google</h2>
+            <details class="info-popover">
+                <summary aria-label="Информация о блоке">i</summary>
+                <div>Показывает, как сайт виден в Google: показы, клики, CTR и среднюю позицию по поисковым запросам.</div>
+            </details>
+        </div>
+        <p>{{ dashboard.gsc_summary.message or 'SEO-показатели за выбранный период.' }}</p>
+    </div>
+
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Показы</span>
+            <strong class="metric-number">{{ dashboard.gsc_summary.impressions }}</strong>
+            <p>Показы сайта в Google</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Клики</span>
+            <strong class="metric-number">{{ dashboard.gsc_summary.clicks }}</strong>
+            <p>Переходы из поиска</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">CTR</span>
+            <strong class="metric-number">{{ "%.2f"|format(dashboard.gsc_summary.ctr * 100) }}%</strong>
+            <p>Доля кликов от показов</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Позиция</span>
+            <strong class="metric-number">{{ "%.1f"|format(dashboard.gsc_summary.position) }}</strong>
+            <p>Среднее место в выдаче</p>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">PageSpeed Insights</span>
+        <div class="section-title-row">
+            <h2>Скорость и техническое качество</h2>
+            <details class="info-popover">
+                <summary aria-label="Информация о блоке">i</summary>
+                <div>Замер Lighthouse: скорость загрузки, Core Web Vitals, доступность, best practices и техническое SEO.</div>
+            </details>
+        </div>
+        <p>Данные Lighthouse помогают AI учитывать скорость, Core Web Vitals, доступность, best practices и SEO.</p>
+    </div>
+
+    <div class="action-buttons">
+        <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
+            <input type="hidden" name="strategy" value="mobile">
+            <button type="submit" class="btn btn-secondary">Проверить mobile</button>
+        </form>
+        <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
+            <input type="hidden" name="strategy" value="desktop">
+            <button type="submit" class="btn btn-secondary">Проверить desktop</button>
+        </form>
+    </div>
+
+    {% if dashboard.pagespeed %}
+    <div class="product-metrics">
+        {% for strategy, result in dashboard.pagespeed.items() %}
+        <div class="metric-card">
+            <span class="metric-label">{{ strategy }}</span>
+            {% if result.error %}
+            <strong class="metric-number">-</strong>
+            <p>{{ result.error }}</p>
+            {% else %}
+            <strong class="metric-number">{{ "%.0f"|format(result.performance_score or 0) }}</strong>
+            <p>Performance</p>
+            <div class="metric-list">
+                <div><span>Accessibility</span><strong>{{ "%.0f"|format(result.accessibility_score or 0) }}</strong></div>
+                <div><span>Best Practices</span><strong>{{ "%.0f"|format(result.best_practices_score or 0) }}</strong></div>
+                <div><span>SEO</span><strong>{{ "%.0f"|format(result.seo_score or 0) }}</strong></div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>PageSpeed еще не запускался для этого сайта.</p>
+    </div>
+    {% endif %}
+</section>
+
+<section class="section">
+    <div class="ai-report-card">
+        <div class="section-heading">
+            <span class="section-kicker">AI-отчет</span>
+            <div class="section-title-row">
+                <h2>Последний вывод</h2>
+                <details class="info-popover">
+                    <summary aria-label="Информация о блоке">i</summary>
+                    <div>AI-вывод строится на данных трекера, Search Console, PageSpeed и снимках страниц.</div>
+                </details>
+            </div>
+        </div>
+
+        {% if dashboard.latest_ai_report %}
+        <div class="report-section">
+            <h3>Что происходит</h3>
+            <p>{{ dashboard.latest_ai_report.summary }}</p>
+        </div>
+        <div class="report-section">
+            <h3>Главная проблема</h3>
+            <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>AI-отчет появится после сбора данных и запуска анализа.</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

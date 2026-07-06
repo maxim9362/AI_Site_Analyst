@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,11 @@ class Event(UUIDMixin, Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     referrer: Mapped[str | None] = mapped_column(Text, nullable=True)
     event_metadata: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_bot: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    bot_name: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
+    bot_category: Mapped[str | None] = mapped_column(String(80), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
     site: Mapped["Site"] = relationship(back_populates="events")

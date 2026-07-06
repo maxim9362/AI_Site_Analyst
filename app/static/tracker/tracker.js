@@ -30,7 +30,8 @@
     LOG_LINKS: (function() {
       var script = getTrackerScript();
       return !script || script.getAttribute('data-log-links') !== 'false';
-    })()
+    })(),
+    GOAL_DEDUP_MS: 2000
   };
 
   // Get site_id from script tag
@@ -343,6 +344,102 @@
       }
 
       sendEvent('click', metadata);
+      detectGoal(target);
+    });
+  }
+
+  // Goal deduplication: same goal_type + key not sent more than once per GOAL_DEDUP_MS.
+  var _goalLastSent = {};
+
+  function goalDedupKey(goalType, key) {
+    return goalType + '|' + key;
+  }
+
+  function canSendGoal(goalType, key) {
+    var dedupKey = goalDedupKey(goalType, key);
+    var now = Date.now();
+    if (_goalLastSent[dedupKey] && (now - _goalLastSent[dedupKey]) < CONFIG.GOAL_DEDUP_MS) {
+      return false;
+    }
+    _goalLastSent[dedupKey] = now;
+    return true;
+  }
+
+  // Detect goal events from clicked element.
+  function detectGoal(el) {
+    var href = (el.href || '').toLowerCase();
+    var text = truncateText(el.textContent || el.value || '', CONFIG.MAX_TEXT_LENGTH).toLowerCase();
+
+    // WhatsApp.
+    if (href.indexOf('wa.me') !== -1 || href.indexOf('whatsapp') !== -1 || text.indexOf('whatsapp') !== -1 || text.indexOf('ватсап') !== -1) {
+      if (canSendGoal('whatsapp', href || text)) {
+        sendEvent('goal', { goal_type: 'whatsapp', label: 'WhatsApp', href: el.href || '', text: truncateText(el.textContent || '', CONFIG.MAX_TEXT_LENGTH) });
+      }
+      return;
+    }
+
+    // Phone.
+    if (href.indexOf('tel:') === 0 || text.indexOf('позвонить') !== -1 || text.indexOf('телефон') !== -1) {
+      if (canSendGoal('phone', href || text)) {
+        sendEvent('goal', { goal_type: 'phone', label: 'Phone call', href: el.href || '', text: truncateText(el.textContent || '', CONFIG.MAX_TEXT_LENGTH) });
+      }
+      return;
+    }
+
+    // Email.
+    if (href.indexOf('mailto:') === 0 || text.indexOf('email') !== -1 || text.indexOf('почта') !== -1) {
+      if (canSendGoal('email', href || text)) {
+        sendEvent('goal', { goal_type: 'email', label: 'Email', href: el.href || '', text: truncateText(el.textContent || '', CONFIG.MAX_TEXT_LENGTH) });
+      }
+      return;
+    }
+
+    // CTA.
+    var ctaMarkers = ['получить', 'оставить заявку', 'заказать', 'связаться', 'консультация', 'написать', 'отправить', 'contact', 'consultation', 'order', 'send'];
+    var isCta = ctaMarkers.some(function(marker) { return text.indexOf(marker) !== -1; });
+    if (isCta) {
+      if (canSendGoal('cta', href || text)) {
+        sendEvent('goal', { goal_type: 'cta', label: 'CTA click', href: el.href || '', text: truncateText(el.textContent || '', CONFIG.MAX_TEXT_LENGTH) });
+      }
+    }
+  }
+
+  // Form tracking: form_start (once per form per session) + form_submit.
+  var _formStartSent = {};
+
+  function trackForms() {
+    // Form start: first focus on any form field.
+    document.addEventListener('focusin', function(e) {
+      var field = e.target;
+      if (!field) return;
+      var form = field.closest('form');
+      if (!form) return;
+
+      var formKey = form.id || form.action || 'form_' + Array.prototype.indexOf.call(document.forms, form);
+      if (_formStartSent[formKey]) return;
+      _formStartSent[formKey] = true;
+
+      var fields = form.querySelectorAll('input, textarea, select');
+      sendEvent('form_start', {
+        form_id: form.id || '',
+        form_action: form.action || '',
+        form_method: form.method || '',
+        fields_count: fields.length
+      });
+    });
+
+    // Form submit.
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      if (!form || form.tagName !== 'FORM') return;
+
+      var fields = form.querySelectorAll('input, textarea, select');
+      sendEvent('form_submit', {
+        form_id: form.id || '',
+        form_action: form.action || '',
+        form_method: form.method || '',
+        fields_count: fields.length
+      });
     });
   }
 
@@ -410,30 +507,6 @@
     });
   }
 
-  // Отправляем факт отправки формы без значений полей, чтобы не собирать персональные данные.
-  function trackFormSubmits() {
-    document.addEventListener('submit', function(e) {
-      var form = e.target;
-      if (!form || form.tagName !== 'FORM') return;
-
-      var fields = [];
-      var formFields = form.querySelectorAll('input, textarea, select');
-      formFields.forEach(function(field) {
-        fields.push({
-          name: field.name || '',
-          type: field.type || field.tagName.toLowerCase()
-        });
-      });
-
-      sendEvent('form_submit', {
-        form_id: form.id || '',
-        action: form.action || '',
-        method: form.method || '',
-        fields: fields
-      });
-    });
-  }
-
   // Track scroll depth
   function trackScrollDepth() {
     var sentLevels = {};
@@ -497,7 +570,7 @@
     }, 1000);
 
     trackClicks();
-    trackFormSubmits();
+    trackForms();
     trackBlockViews();
     trackScrollDepth();
     trackTimeOnPage();

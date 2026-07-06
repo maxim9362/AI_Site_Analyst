@@ -45,18 +45,32 @@ CLASSIFICATION_RESPONSE_SCHEMA = {
 
 REPORT_PROMPT = """Ты AI-аналитик сайта.
 
-Ты анализируешь сайт клиента и поведение посетителей.
+Ты анализируешь сайт клиента, поведение посетителей и, если есть, данные Google Search Console.
 
 Используй только переданные данные:
 - тексты сайта;
 - классификации блоков;
 - события аналитики;
 - page snapshots;
+- данные Google Search Console (показы, клики, CTR, позиции, запросы);
 - явно переданные данные.
 
 Не придумывай цены, услуги, сроки, гарантии, причины или факты.
 
 Если данных недостаточно - так и напиши.
+
+Если Google Search Console данных нет, не делай выводы про:
+- показы в Google;
+- клики из Google;
+- CTR;
+- среднюю позицию;
+- поисковые запросы;
+- SEO-страницы.
+
+Если Google Search Console данные есть, анализируй их вместе с поведением пользователей на сайте.
+Обращай внимание на запросы с высокими показами но низким CTR.
+Обращай внимание на запросы с хорошей позицией но малым количеством кликов.
+Связывай данные GSC с поведением на сайте: какие страницы получают трафик из Google, конвертируются ли посетители из поиска.
 
 Пиши простым языком для владельца малого бизнеса.
 Не используй сложные технические термины.
@@ -105,6 +119,9 @@ REPORT_RESPONSE_SCHEMA = {
         "strengths": {"type": "array", "items": {"type": "string"}},
         "weaknesses": {"type": "array", "items": {"type": "string"}},
         "missing_information": {"type": "array", "items": {"type": "string"}},
+        "seo_insights": {"type": "array", "items": {"type": "string"}},
+        "traffic_insights": {"type": "array", "items": {"type": "string"}},
+        "conversion_insights": {"type": "array", "items": {"type": "string"}},
     },
     "required": ["summary", "main_problem", "recommendations", "funnel", "strengths", "weaknesses", "missing_information"],
 }
@@ -176,6 +193,11 @@ class AIService:
         weaknesses = []
         strengths = []
         missing_information = []
+        seo_insights = []
+        traffic_insights = []
+        conversion_insights = []
+
+        has_gsc = "GOOGLE SEARCH CONSOLE" in context and "is_connected" in context and '"is_connected": true' in context
 
         if funnel["pageviews"] == 0:
             missing_information.append("Нет просмотров страниц за выбранный период.")
@@ -188,8 +210,18 @@ class AIService:
         else:
             missing_information.append("На сайте не найдены контактные данные.")
 
+        # Traffic insights.
+        if funnel["pageviews"] > 0:
+            traffic_insights.append(f"За период зафиксировано {funnel['pageviews']} просмотров страниц.")
+        if funnel["viewed_services"] > 0:
+            traffic_insights.append(f"Просмотрели услуги: {funnel['viewed_services']} раз.")
+        if funnel["viewed_pricing"] > 0:
+            traffic_insights.append(f"Просмотрели цены: {funnel['viewed_pricing']} раз.")
+
+        # Conversion insights.
         if funnel["viewed_services"] > 0 and funnel["clicked_cta"] == 0 and funnel["submitted_form"] == 0:
             weaknesses.append("Посетители доходят до услуг, но не фиксируются клики по CTA или отправки формы.")
+            conversion_insights.append("Посетители смотрят услуги, но не оставляют заявку.")
             recommendations.append({
                 "priority": "high",
                 "title": "Усилить CTA после блока услуг",
@@ -199,6 +231,7 @@ class AIService:
 
         if funnel["viewed_pricing"] > 0 and funnel["submitted_form"] == 0:
             weaknesses.append("Посетители видят цены, но не отправляют форму.")
+            conversion_insights.append("Блок цен просматривается, но конверсия в заявку низкая.")
             recommendations.append({
                 "priority": "medium",
                 "title": "Добавить кнопку заявки рядом с ценами",
@@ -208,6 +241,7 @@ class AIService:
 
         if funnel["submitted_form"] > 0:
             strengths.append("Форма заявки работает и уже получила отправку.")
+            conversion_insights.append("Форма заявки отправляется — канал работает.")
         if funnel["clicked_whatsapp"] == 0 and "WhatsApp" in context:
             recommendations.append({
                 "priority": "medium",
@@ -215,6 +249,12 @@ class AIService:
                 "reason": "WhatsApp найден на сайте, но кликов по нему в аналитике нет.",
                 "expected_effect": "Часть пользователей сможет быстрее перейти к диалогу.",
             })
+
+        # SEO insights (только если GSC данные есть).
+        if has_gsc:
+            if "нотариус" in context.lower():
+                seo_insights.append("Сайт получает показы по нотариальным запросам. Стоит проверить CTR и позиции.")
+            seo_insights.append("Данные Google Search Console доступны для анализа SEO-трафика.")
 
         if not recommendations:
             recommendations.append({
@@ -239,6 +279,9 @@ class AIService:
             "strengths": strengths,
             "weaknesses": weaknesses,
             "missing_information": missing_information,
+            "seo_insights": seo_insights,
+            "traffic_insights": traffic_insights,
+            "conversion_insights": conversion_insights,
         }
 
     async def classify_text(self, text: str) -> dict:
@@ -287,9 +330,18 @@ class AIService:
             return self._fallback_generate_report(context)
 
         try:
+            # Правило Search Console защищает отчет от SEO-выводов, когда GSC еще не подключен.
+            report_prompt = REPORT_PROMPT + """
+
+Дополнительные правила:
+- Верни seo_insights если есть GSC данные, пустой массив если нет.
+- Верни traffic_insights с выводами по посещениям и поведению.
+- Верни conversion_insights с выводами по заявкам и действиям.
+- Не придумывай данные которых нет в переданном контексте.
+"""
             response = self.model.generate_content(
                 [
-                    REPORT_PROMPT,
+                    report_prompt,
                     f"Данные для анализа:\n\n{context}",
                 ],
                 generation_config=genai.GenerationConfig(

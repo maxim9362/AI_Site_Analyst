@@ -6,6 +6,8 @@ VALID_EVENT_TYPES = [
     "time_on_page",
     "page_leave",
     "form_submit",
+    "form_start",
+    "goal",
 ]
 
 VALID_REPORT_TYPES = [

@@ -13,7 +13,8 @@ def setup_logging() -> None:
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    sqlalchemy_level = logging.INFO if settings.SQL_ECHO else logging.WARNING
+    logging.getLogger("sqlalchemy.engine").setLevel(sqlalchemy_level)
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 
@@ -22,6 +23,6 @@ def setup_logging() -> None:
 
     # В локальной консоли сразу показываем основные ссылки, чтобы запуск MVP было легко проверить вручную.
     logger.info(f"Admin clients: {settings.APP_BASE_URL}/admin/clients")
-    logger.info(f"Demo site: {settings.APP_BASE_URL}/demo-site/")
+    logger.info(f"Demo site: {settings.APP_BASE_URL}/demo")
     logger.info(f"Tracker script: {settings.APP_BASE_URL}/static/tracker/tracker.js")
     logger.info(f"Health check: {settings.APP_BASE_URL}/health")

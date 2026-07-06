@@ -1,0 +1,241 @@
+import hashlib
+import hmac
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.config import settings
+from app.core.token_crypto import decode_token, encode_token
+from app.repositories.gsc_repository import GSCRepository
+from app.repositories.site_repository import SiteRepository
+
+logger = logging.getLogger(__name__)
+
+
+def _get_state_secret() -> str:
+    return settings.ADMIN_SESSION_SECRET or settings.ADMIN_DASHBOARD_PASSWORD
+
+
+def _sign_state(public_site_id: str) -> str:
+    """Create signed state with public_site_id and timestamp."""
+    payload = f"{public_site_id}:{int(time.time())}"
+    secret = _get_state_secret()
+    signature = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
+    return f"{payload}:{signature}"
+
+
+def _verify_state(state: str) -> str | None:
+    """Verify signed state and extract public_site_id. Returns None if invalid."""
+    parts = state.split(":")
+    if len(parts) != 3:
+        return None
+    public_site_id, ts_str, signature = parts
+    expected_payload = f"{public_site_id}:{ts_str}"
+    secret = _get_state_secret()
+    expected_sig = hmac.new(secret.encode(), expected_payload.encode(), hashlib.sha256).hexdigest()[:16]
+    if not hmac.compare_digest(signature, expected_sig):
+        return None
+    try:
+        ts = int(ts_str)
+    except ValueError:
+        return None
+    if time.time() - ts > 600:
+        return None
+    return public_site_id
+
+
+class GSCOAuthService:
+    """Handles Google OAuth flow for Search Console integration."""
+
+    def __init__(self, session: AsyncSession):
+        self.session = session
+        self.site_repository = SiteRepository(session)
+        self.gsc_repository = GSCRepository(session)
+
+    def get_authorization_url(self, public_site_id: str) -> str | None:
+        """Generate Google OAuth authorization URL with signed state.
+
+        Returns None if Google credentials are not configured.
+        """
+        if not settings.google_oauth_configured:
+            return None
+
+        from google_auth_oauthlib.flow import Flow
+
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                }
+            },
+            scopes=settings.GOOGLE_SCOPES.split(","),
+        )
+        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+        state = _sign_state(public_site_id)
+        authorization_url, _ = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            state=state,
+        )
+        return authorization_url
+
+    async def handle_callback(self, code: str, state: str) -> dict[str, Any]:
+        """Exchange authorization code for tokens and save to GSC property."""
+        public_site_id = _verify_state(state)
+        if not public_site_id:
+            return {"status": "error", "message": "Invalid or expired OAuth state"}
+
+        if not settings.google_oauth_configured:
+            return {"status": "error", "message": "Google OAuth credentials are not configured"}
+
+        site = await self.site_repository.get_site_by_site_id(public_site_id)
+        if not site:
+            return {"status": "error", "message": "Site not found"}
+
+        try:
+            from google_auth_oauthlib.flow import Flow
+
+            flow = Flow.from_client_config(
+                {
+                    "web": {
+                        "client_id": settings.GOOGLE_CLIENT_ID,
+                        "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                        "token_uri": "https://oauth2.googleapis.com/token",
+                    }
+                },
+                scopes=settings.GOOGLE_SCOPES.split(","),
+            )
+            flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+            flow.fetch_token(code=code)
+            credentials = flow.credentials
+        except Exception as e:
+            logger.error(f"OAuth token exchange failed: {e}")
+            return {"status": "error", "message": f"Token exchange failed: {str(e)[:200]}"}
+
+        google_email = None
+        try:
+            from googleapiclient.discovery import build
+            oauth_service = build("oauth2", "v2", credentials=credentials)
+            user_info = oauth_service.userinfo().get().execute()
+            google_email = user_info.get("email")
+        except Exception:
+            logger.warning("Could not fetch Google user email")
+
+        property_obj = await self.gsc_repository.get_property_by_site(site.id)
+        if not property_obj:
+            property_url = f"https://{site.domain}/" if "." in site.domain else "https://localhost/"
+            property_obj = await self.gsc_repository.create_or_update_property(site.id, site.site_id, property_url)
+
+        await self.gsc_repository.update_oauth_tokens(
+            property_obj,
+            access_token=encode_token(credentials.token),
+            refresh_token=encode_token(credentials.refresh_token),
+            token_expires_at=credentials.expiry,
+            scopes=",".join(credentials.scopes or []),
+            google_account_email=google_email,
+        )
+
+        logger.info(f"GSC OAuth completed for site {public_site_id}, email: {google_email}")
+
+        return {
+            "status": "ok",
+            "message": "Google Search Console connected successfully",
+            "site_id": public_site_id,
+            "google_account_email": google_email,
+            "property_url": property_obj.property_url,
+        }
+
+    async def refresh_token_if_needed(self, site_id) -> bool:
+        """Refresh access_token if expired. Returns True if successful."""
+        property_obj = await self.gsc_repository.get_property_by_site(site_id)
+        if not property_obj or not property_obj.refresh_token:
+            return False
+
+        needs_refresh = (
+            not property_obj.token_expires_at
+            or property_obj.token_expires_at <= datetime.now(timezone.utc) + timedelta(minutes=5)
+        )
+        if not needs_refresh:
+            return True
+
+        if not settings.google_oauth_configured:
+            return False
+
+        try:
+            from google.auth.transport.requests import Request
+            from google.oauth2.credentials import Credentials
+
+            credentials = Credentials(
+                token=decode_token(property_obj.access_token),
+                refresh_token=decode_token(property_obj.refresh_token),
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=settings.GOOGLE_CLIENT_ID,
+                client_secret=settings.GOOGLE_CLIENT_SECRET,
+            )
+            credentials.refresh(Request())
+
+            await self.gsc_repository.update_oauth_tokens(
+                property_obj,
+                access_token=encode_token(credentials.token),
+                refresh_token=encode_token(credentials.refresh_token),
+                token_expires_at=credentials.expiry,
+                scopes=property_obj.scopes,
+                google_account_email=property_obj.google_account_email,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Token refresh failed for site {site_id}: {e}")
+            await self.gsc_repository.update_last_error(property_obj, f"Token refresh failed: {str(e)[:200]}")
+            return False
+
+    async def get_credentials(self, site_id):
+        """Get valid Google credentials for a site, refreshing if needed."""
+        refreshed = await self.refresh_token_if_needed(site_id)
+        if not refreshed:
+            return None
+
+        property_obj = await self.gsc_repository.get_property_by_site(site_id)
+        if not property_obj or not property_obj.access_token:
+            return None
+
+        from google.oauth2.credentials import Credentials
+
+        return Credentials(
+            token=decode_token(property_obj.access_token),
+            refresh_token=decode_token(property_obj.refresh_token),
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            scopes=property_obj.scopes.split(",") if property_obj.scopes else [],
+        )
+
+    async def disconnect(self, public_site_id: str) -> dict[str, Any]:
+        """Disconnect GSC by clearing tokens."""
+        site = await self.site_repository.get_site_by_site_id(public_site_id)
+        if not site:
+            return {"status": "error", "message": "Site not found"}
+
+        property_obj = await self.gsc_repository.get_property_by_site(site.id)
+        if not property_obj:
+            return {"status": "error", "message": "GSC property not found"}
+
+        await self.gsc_repository.update_oauth_tokens(
+            property_obj,
+            access_token=None,
+            refresh_token=None,
+            token_expires_at=None,
+            scopes=None,
+            google_account_email=None,
+        )
+        # update_oauth_tokens sets is_connected=True, override it.
+        property_obj.is_connected = False
+        await self.session.commit()
+
+        return {"status": "ok", "message": "Google Search Console disconnected"}

@@ -25,13 +25,26 @@ body {
 
 .hero h1 {
     font-size: 2.5rem;
+    hyphens: none;
     margin-bottom: 1rem;
+    overflow-wrap: normal;
+    text-wrap: balance;
+    word-break: normal;
 }
 
 .subtitle {
     font-size: 1.2rem;
     opacity: 0.9;
     margin-bottom: 2rem;
+    hyphens: none;
+    overflow-wrap: normal;
+    text-wrap: balance;
+    word-break: normal;
+}
+
+.nowrap,
+.no-wrap {
+    white-space: nowrap;
 }
 
 .navbar {

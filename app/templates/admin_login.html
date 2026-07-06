@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — AI Site Analyst</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="/">AI Site Analyst</a>
+        </div>
+    </nav>
+    <main class="container">
+        <div class="login-card">
+            <h1>Вход в админку</h1>
+            <p>Введите пароль для доступа к панели управления.</p>
+            {% if error %}
+            <div class="alert alert-error">{{ error }}</div>
+            {% endif %}
+            <form method="POST" action="/admin/login">
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password" autofocus required>
+                </div>
+                <button type="submit" class="btn btn-primary">Войти</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

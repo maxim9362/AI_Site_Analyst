@@ -3,13 +3,13 @@
 {% block title %}{{ site.name }} - AI Site Analyst{% endblock %}
 
 {% block content %}
-<div class="dashboard-header">
+<div class="product-header">
     <div>
         <a href="/admin/clients" class="back-link">Назад к клиентам</a>
         <h1>{{ site.name }}</h1>
         <p>{{ site.domain }}</p>
     </div>
-    <div class="dashboard-header-meta">
+    <div class="product-header-meta">
         <span>Site ID</span>
         <code>{{ site.site_id }}</code>
         <span class="status-badge {{ 'is-active' if site.is_active else 'is-inactive' }}">
@@ -18,37 +18,63 @@
     </div>
 </div>
 
-{% if site_status %}
+{% if dashboard.site_score and not dashboard.site_score.error %}
 <section class="section">
-    <div class="status-card status-{{ site_status.status }}">
-        <div class="status-card-main">
-            <span class="section-kicker">Статус обработки</span>
-            <strong>{{ site_status.status_label }}</strong>
-            <p>{{ site_status.message }}</p>
+    <div class="score-card">
+        <div class="score-main">
+            {% if dashboard.site_score.overall_score is not none %}
+            <div class="score-number">{{ dashboard.site_score.overall_score }}<span class="score-total">/100</span></div>
+            {% else %}
+            <div class="score-number score-no-data">—<span class="score-total">/100</span></div>
+            {% endif %}
+            <div class="score-info">
+                <span class="score-label-text">{{ dashboard.site_score.label }}</span>
+                <p>{{ dashboard.site_score.message }}</p>
+            </div>
         </div>
 
-        <div class="status-readiness">
-            {# Чеклист показывает этапы готовности человеческими названиями, без внутренних полей has_*. #}
-            <div class="{{ 'is-ready' if site_status.has_events else 'is-waiting' }}">
-                <span>{{ 'Готово' if site_status.has_events else 'Нет' }}</span>
-                <strong>События</strong>
+        <div class="score-breakdown">
+            {% for key, item in dashboard.site_score.scores.items() %}
+            <div class="score-item {{ 'score-item-no-data' if item.status == 'no_data' }}">
+                <div class="score-item-header">
+                    <span class="score-item-label">{{ item.label }}</span>
+                    {% if item.score is not none %}
+                    <span class="score-item-number">{{ item.score }}/100</span>
+                    {% else %}
+                    <span class="score-item-number score-status-no-data">нет данных</span>
+                    {% endif %}
+                </div>
+                {% if item.score is not none %}
+                <div class="score-bar">
+                    <div class="score-bar-fill" style="width: {{ item.score }}%"></div>
+                </div>
+                {% endif %}
+                <p class="score-item-message">{{ item.message }}</p>
             </div>
-            <div class="{{ 'is-ready' if site_status.has_snapshots else 'is-waiting' }}">
-                <span>{{ 'Готово' if site_status.has_snapshots else 'Нет' }}</span>
-                <strong>Снимки страниц</strong>
-            </div>
-            <div class="{{ 'is-ready' if site_status.has_knowledge else 'is-waiting' }}">
-                <span>{{ 'Готово' if site_status.has_knowledge else 'Нет' }}</span>
-                <strong>База знаний</strong>
-            </div>
-            <div class="{{ 'is-ready' if site_status.has_classifications else 'is-waiting' }}">
-                <span>{{ 'Готово' if site_status.has_classifications else 'Нет' }}</span>
-                <strong>AI-классификация</strong>
-            </div>
-            <div class="{{ 'is-ready' if site_status.has_reports else 'is-waiting' }}">
-                <span>{{ 'Готово' if site_status.has_reports else 'Нет' }}</span>
-                <strong>AI-отчеты</strong>
-            </div>
+            {% endfor %}
+        </div>
+
+        {% if dashboard.site_score.quick_wins %}
+        <div class="quick-wins">
+            <h3>Что улучшить в первую очередь</h3>
+            <ol class="clean-list">
+                {% for win in dashboard.site_score.quick_wins %}
+                <li>{{ win }}</li>
+                {% endfor %}
+            </ol>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endif %}
+
+{% if dashboard.site_status %}
+<section class="section">
+    <div class="status-card status-{{ dashboard.site_status.status }}">
+        <div class="status-card-main">
+            <span class="section-kicker">Статус сайта</span>
+            <strong>{{ dashboard.site_status.status_label }}</strong>
+            <p>{{ dashboard.site_status.message }}</p>
         </div>
     </div>
 </section>
@@ -57,92 +83,230 @@
 <section class="section">
     <div class="tracker-card">
         <div>
-            <span class="section-kicker">Код подключения</span>
+            <span class="section-kicker">Подключение</span>
             <h2>tracker.js</h2>
-            <p>Вставьте этот код перед закрывающим тегом &lt;/body&gt; на сайте клиента.</p>
+            <p>Код для установки на сайт клиента. После установки система начнет собирать посещения, клики и снимки страниц.</p>
         </div>
         <div class="code-block">
-            {# TODO: В production заменить localhost на публичный домен сервера. #}
-            <code>&lt;script src="http://localhost:8000/static/tracker/tracker.js" data-site-id="{{ site.site_id }}"&gt;&lt;/script&gt;</code>
+            {# Этот код копируется из admin.js и нужен клиенту для подключения сбора данных. #}
+            <code>{{ dashboard.tracker_code }}</code>
         </div>
     </div>
 </section>
 
-{% if simple_analytics %}
+<section class="section">
+    <div class="period-switcher" aria-label="Выбор периода">
+        {% for option in dashboard.period_options %}
+        <a href="/admin/sites/{{ site.site_id }}?period={{ option.value }}" class="{{ 'is-active' if option.value == dashboard.period else '' }}">
+            {{ option.label }}
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="section">
+    <div class="performance-card">
+        <div class="section-heading">
+            <span class="section-kicker">Performance overview</span>
+            <h2>Динамика сайта и поиска</h2>
+            <p>Период: {{ dashboard.period_label }}</p>
+        </div>
+
+        <div class="metric-toggle-row" data-chart-toggles>
+            {% for series in dashboard.chart_data.series %}
+            <label class="metric-toggle {{ 'is-disabled' if series.disabled }}" style="--metric-color: {{ series.color }}">
+                <input type="checkbox" value="{{ series.key }}" {{ 'checked' if not series.disabled }} {{ 'disabled' if series.disabled }}>
+                <span>{{ series.label }}</span>
+                {% if series.disabled and dashboard.chart_data.gsc_message %}
+                <span class="toggle-hint">{{ dashboard.chart_data.gsc_message }}</span>
+                {% endif %}
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="chart-shell">
+            <canvas id="performanceChart" data-chart='{{ dashboard.chart_data | tojson }}' width="1200" height="420"></canvas>
+            <div id="chartEmpty" class="chart-empty" style="display:none;">
+                Пока недостаточно данных для графика. Система собирает посещения.
+            </div>
+        </div>
+
+        <div class="chart-note">
+            <p>График показывает динамику метрик. Точные значения смотрите в карточках и таблицах ниже.</p>
+            {% if dashboard.chart_data.gsc_available_for_period %}
+            <p class="chart-note-hint">Для средней позиции меньшее число означает лучший результат.</p>
+            {% endif %}
+        </div>
+
+        {% if dashboard.chart_data.gsc_message %}
+        <div class="gsc-empty-state">
+            {{ dashboard.chart_data.gsc_message }}
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% if dashboard.tracker_analytics %}
 <section class="section">
     <div class="section-heading">
-        <span class="section-kicker">Бизнес-картина</span>
-        <h2>Простая аналитика за {{ simple_analytics.period_days }} дней</h2>
-        <p>{{ simple_analytics.message }}</p>
+        <span class="section-kicker">Простая аналитика</span>
+        <h2>Что делают посетители</h2>
+        <p>{{ dashboard.tracker_analytics.message }}</p>
     </div>
 
-    <div class="analytics-grid">
+    <div class="product-metrics">
         <div class="metric-card">
             <span class="metric-label">Посетители</span>
-            <strong class="metric-number">{{ simple_analytics.visitors.unique_visitors }}</strong>
-            <p>Сессий: {{ simple_analytics.visitors.unique_sessions }}</p>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.visitors.unique_visitors }}</strong>
+            <p>Сессий: {{ dashboard.tracker_analytics.visitors.unique_sessions }}</p>
         </div>
 
         <div class="metric-card">
-            <span class="metric-label">Просмотры страниц</span>
-            <strong class="metric-number">{{ simple_analytics.pageviews.total }}</strong>
+            <span class="metric-label">Просмотры</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.pageviews.total }}</strong>
+            <p>Всего просмотров страниц</p>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Клики</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.clicks.total }}</strong>
+            <p>Нажатия по кнопкам и ссылкам</p>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Целевые действия</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.goals.total }}</strong>
+            <p>WhatsApp, телефон, email, CTA, формы</p>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Боты</span>
+            <strong class="metric-number">{{ dashboard.tracker_analytics.bots.unique_bots }}</strong>
+            <p>Событий: {{ dashboard.tracker_analytics.bots.total_events }}</p>
+        </div>
+    </div>
+
+    <div class="analytics-grid">
+        <div class="metric-card funnel-card">
+            <span class="metric-label">Воронка</span>
+            <div class="funnel-list">
+                {# Воронка показывает бизнес-шаги без внутренних названий событий и служебных идентификаторов. #}
+                <div><span>Зашли на сайт</span><strong>{{ dashboard.tracker_analytics.funnel.site_visits }}</strong></div>
+                <div><span>Смотрели услуги</span><strong>{{ dashboard.tracker_analytics.funnel.viewed_services }}</strong></div>
+                <div><span>Смотрели цены</span><strong>{{ dashboard.tracker_analytics.funnel.viewed_pricing }}</strong></div>
+                <div><span>Нажали кнопку / связались</span><strong>{{ dashboard.tracker_analytics.funnel.contact_actions }}</strong></div>
+                <div><span>Начали форму</span><strong>{{ dashboard.tracker_analytics.funnel.form_starts }}</strong></div>
+                <div><span>Отправили форму</span><strong>{{ dashboard.tracker_analytics.funnel.form_submits }}</strong></div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Детали целей</span>
             <div class="metric-list">
-                {% for page in simple_analytics.pageviews.top_pages %}
-                <div><span>{{ page.path }}</span><strong>{{ page.views }}</strong></div>
+                <div><span>WhatsApp</span><strong>{{ dashboard.tracker_analytics.goals.whatsapp }}</strong></div>
+                <div><span>Телефон</span><strong>{{ dashboard.tracker_analytics.goals.phone }}</strong></div>
+                <div><span>Email</span><strong>{{ dashboard.tracker_analytics.goals.email }}</strong></div>
+                <div><span>CTA</span><strong>{{ dashboard.tracker_analytics.goals.cta }}</strong></div>
+                <div><span>Начали форму</span><strong>{{ dashboard.tracker_analytics.goals.form_starts }}</strong></div>
+                <div><span>Отправили форму</span><strong>{{ dashboard.tracker_analytics.goals.form_submits }}</strong></div>
+            </div>
+        </div>
+
+        <div class="metric-card">
+            <span class="metric-label">Информация о ботах</span>
+            <div class="metric-list">
+                {% for bot in dashboard.tracker_analytics.bots.known_bots %}
+                <div><span>{{ bot.name }} · {{ bot.category }}</span><strong>{{ bot.events }}</strong></div>
                 {% else %}
-                <div><span>Популярных страниц пока нет</span><strong>0</strong></div>
+                <div><span>Ботов за период не обнаружено</span><strong>0</strong></div>
                 {% endfor %}
             </div>
         </div>
 
         <div class="metric-card">
-            <span class="metric-label">Вовлеченность</span>
+            <span class="metric-label">Популярные страницы</span>
             <div class="metric-list">
-                <div><span>Доскроллили до 25%</span><strong>{{ simple_analytics.engagement.scroll_25 }}</strong></div>
-                <div><span>Доскроллили до 50%</span><strong>{{ simple_analytics.engagement.scroll_50 }}</strong></div>
-                <div><span>Доскроллили до 75%</span><strong>{{ simple_analytics.engagement.scroll_75 }}</strong></div>
-                <div><span>Доскроллили до 100%</span><strong>{{ simple_analytics.engagement.scroll_100 }}</strong></div>
+                {% for page in dashboard.tracker_analytics.pageviews.top_pages %}
+                <div><span>{{ page.path }}</span><strong>{{ page.views }}</strong></div>
+                {% else %}
+                <div><span>Данных пока нет</span><strong>0</strong></div>
+                {% endfor %}
             </div>
         </div>
 
         <div class="metric-card">
-            <span class="metric-label">Клики</span>
-            <strong class="metric-number">{{ simple_analytics.clicks.total }}</strong>
+            <span class="metric-label">Главные клики</span>
             <div class="metric-list">
-                {% for click in simple_analytics.clicks.top_clicks %}
+                {% for click in dashboard.tracker_analytics.clicks.top_clicks %}
                 <div><span>{{ click.label }}</span><strong>{{ click.count }}</strong></div>
                 {% else %}
                 <div><span>Кликов пока нет</span><strong>0</strong></div>
                 {% endfor %}
             </div>
         </div>
-
-        <div class="metric-card">
-            <span class="metric-label">Целевые действия</span>
-            <strong class="metric-number">{{ simple_analytics.goals.total }}</strong>
-            <div class="metric-list">
-                <div><span>WhatsApp</span><strong>{{ simple_analytics.goals.whatsapp }}</strong></div>
-                <div><span>Телефон</span><strong>{{ simple_analytics.goals.phone }}</strong></div>
-                <div><span>Email</span><strong>{{ simple_analytics.goals.email }}</strong></div>
-                <div><span>Формы</span><strong>{{ simple_analytics.goals.forms }}</strong></div>
-                <div><span>CTA</span><strong>{{ simple_analytics.goals.cta }}</strong></div>
-            </div>
-        </div>
-
-        <div class="metric-card funnel-card">
-            <span class="metric-label">Воронка</span>
-            <div class="funnel-list">
-                {# Воронка показывает бизнес-шаги без event_type, UUID и других технических полей. #}
-                <div><span>Зашли на сайт</span><strong>{{ simple_analytics.funnel.site_visits }}</strong></div>
-                <div><span>Смотрели услуги</span><strong>{{ simple_analytics.funnel.viewed_services }}</strong></div>
-                <div><span>Смотрели цены</span><strong>{{ simple_analytics.funnel.viewed_pricing }}</strong></div>
-                <div><span>Нажали кнопку / связались</span><strong>{{ simple_analytics.funnel.contact_actions }}</strong></div>
-                <div><span>Отправили форму</span><strong>{{ simple_analytics.funnel.form_submits }}</strong></div>
-            </div>
-        </div>
     </div>
 </section>
 {% endif %}
+
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">Google Search Console</span>
+        <h2>Поисковые запросы</h2>
+        <p>Запросы, по которым сайт показывался в Google.</p>
+    </div>
+
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">SEO показы</span>
+            <strong class="metric-number">{{ dashboard.gsc_summary.impressions }}</strong>
+            <p>Показы сайта в Google</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">SEO клики</span>
+            <strong class="metric-number">{{ dashboard.gsc_summary.clicks }}</strong>
+            <p>Переходы из поиска</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">CTR</span>
+            <strong class="metric-number">{{ "%.2f"|format(dashboard.gsc_summary.ctr * 100) }}%</strong>
+            <p>Доля кликов от показов</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Средняя позиция</span>
+            <strong class="metric-number">{{ "%.1f"|format(dashboard.gsc_summary.position) }}</strong>
+            <p>Среднее место сайта в выдаче</p>
+        </div>
+    </div>
+
+    <div class="table-container query-table">
+        {% if dashboard.gsc_top_queries %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Запрос</th>
+                    <th>Показы</th>
+                    <th>Клики</th>
+                    <th>CTR</th>
+                    <th>Позиция</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for query in dashboard.gsc_top_queries %}
+                <tr>
+                    <td>{{ query.query }}</td>
+                    <td>{{ query.impressions }}</td>
+                    <td>{{ query.clicks }}</td>
+                    <td>{{ "%.2f"|format(query.ctr * 100) }}%</td>
+                    <td>{{ "%.1f"|format(query.position) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state"><p>Данных Google Search Console пока нет.</p></div>
+        {% endif %}
+    </div>
+</section>
 
 <section class="section">
     <div class="ai-report-card">
@@ -151,27 +315,27 @@
             <h2>Последний AI-отчет</h2>
         </div>
 
-        {% if latest_report %}
+        {% if dashboard.latest_ai_report %}
         <div class="ai-report-meta">
-            <span>{{ latest_report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
-            <span>{{ latest_report.report_type }}</span>
+            <span>{{ dashboard.latest_ai_report.created_at.strftime('%Y-%m-%d %H:%M') }}</span>
+            <span>{{ dashboard.latest_ai_report.report_type }}</span>
         </div>
 
         <div class="report-section">
-            <h3>Краткое резюме</h3>
-            <p>{{ latest_report.summary }}</p>
+            <h3>Что происходит</h3>
+            <p>{{ dashboard.latest_ai_report.summary }}</p>
         </div>
 
         <div class="report-section">
-            <h3>Главная проблема</h3>
-            <p class="problem-text">{{ latest_report.main_problem }}</p>
+            <h3>Где проблема</h3>
+            <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
         </div>
 
-        {% if latest_report.recommendations %}
+        {% if dashboard.latest_ai_report.recommendations %}
         <div class="report-section">
-            <h3>Рекомендации</h3>
+            <h3>Что улучшить</h3>
             <ol class="clean-list">
-                {% for rec in latest_report.recommendations %}
+                {% for rec in dashboard.latest_ai_report.recommendations %}
                 <li>
                     {% if rec is mapping %}
                     <strong>{{ rec.title or 'Рекомендация' }}</strong>
@@ -186,203 +350,85 @@
         </div>
         {% endif %}
 
-        {% if latest_report.strengths %}
+        {% if dashboard.ai_insights.seo_insights %}
         <div class="report-section">
-            <h3>Что уже хорошо</h3>
+            <h3>SEO-выводы</h3>
             <ul class="clean-list">
-                {% for strength in latest_report.strengths %}
-                <li>{{ strength }}</li>
+                {% for insight in dashboard.ai_insights.seo_insights %}
+                <li>{{ insight }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% elif dashboard.gsc_connected %}
+        <div class="report-section">
+            <h3>SEO-выводы</h3>
+            <p class="section-note">SEO-выводы появятся после подключения Google Search Console и генерации AI-отчёта.</p>
+        </div>
+        {% endif %}
+
+        {% if dashboard.ai_insights.traffic_insights %}
+        <div class="report-section">
+            <h3>Трафик</h3>
+            <ul class="clean-list">
+                {% for insight in dashboard.ai_insights.traffic_insights %}
+                <li>{{ insight }}</li>
                 {% endfor %}
             </ul>
         </div>
         {% endif %}
 
-        {% if latest_report.weaknesses %}
+        {% if dashboard.ai_insights.conversion_insights %}
         <div class="report-section">
-            <h3>Что слабое</h3>
+            <h3>Конверсия</h3>
             <ul class="clean-list">
-                {% for weakness in latest_report.weaknesses %}
-                <li>{{ weakness }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        {% if latest_report.missing_information %}
-        <div class="report-section">
-            <h3>Чего не хватает на сайте</h3>
-            <ul class="clean-list">
-                {% for item in latest_report.missing_information %}
-                <li>{{ item }}</li>
+                {% for insight in dashboard.ai_insights.conversion_insights %}
+                <li>{{ insight }}</li>
                 {% endfor %}
             </ul>
         </div>
         {% endif %}
         {% else %}
         <div class="empty-state">
-            <p>AI-отчет пока не создан. Сначала нужно собрать данные, затем запустить генерацию отчета.</p>
+            <p>AI-отчет пока не создан. Когда появятся данные сайта и аналитики, здесь будет понятный вывод с рекомендациями.</p>
         </div>
         {% endif %}
     </div>
 </section>
 
 <section class="section">
-    <div class="action-panel" data-site-id="{{ site.site_id }}">
-        <div>
-            <h2>Ручные действия MVP</h2>
-            <p>Эти кнопки нужны для проверки пайплайна во время разработки.</p>
-        </div>
-        <div class="action-buttons">
-            {# Кнопки вызывают существующие API и не меняют бизнес-логику сбора событий. #}
-            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/knowledge/build-latest">
-                Собрать знания
-            </button>
-            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/classify">
-                Классифицировать блоки
-            </button>
-            <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/reports/generate?days=7">
-                Создать отчет
-            </button>
-            <button class="btn btn-primary" data-admin-action="sequence" data-endpoints="/api/sites/{{ site.site_id }}/knowledge/build-latest|/api/sites/{{ site.site_id }}/classify|/api/sites/{{ site.site_id }}/reports/generate?days=7">
-                Полный анализ
-            </button>
-        </div>
-        <div class="admin-action-status" aria-live="polite"></div>
-    </div>
-</section>
+    <details class="developer-details">
+        <summary>Технические данные для разработчика</summary>
+        <p class="developer-note">Этот блок нужен только для проверки работы системы. Клиенту его показывать не нужно.</p>
 
-<section class="section technical-section">
-    <div class="section-heading">
-        <span class="section-kicker">Debug</span>
-        <h2>Технические данные</h2>
-        <p>Этот блок нужен для проверки работы системы. Клиенту его можно не показывать.</p>
-    </div>
-
-    <div class="technical-summary">
-        <div><span>Снимки страниц</span><strong>{{ dashboard_counts.snapshots }}</strong></div>
-        <div><span>Фрагменты знаний</span><strong>{{ dashboard_counts.knowledge_chunks }}</strong></div>
-        <div><span>AI-классификации</span><strong>{{ dashboard_counts.classifications }}</strong></div>
-        <div><span>AI-отчеты</span><strong>{{ dashboard_counts.reports }}</strong></div>
-    </div>
-
-    <div class="technical-block">
-        <h3>Последние события</h3>
-        {% if recent_events %}
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Visitor</th>
-                        <th>Path</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for event in recent_events %}
-                    <tr>
-                        <td><span class="badge badge-{{ event.event_type }}">{{ event.event_type }}</span></td>
-                        <td><code>{{ event.visitor_id[:15] }}...</code></td>
-                        <td>{{ event.path }}</td>
-                        <td>{{ event.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="technical-summary">
+            <div><span>События</span><strong>{{ dashboard.technical_counts.events }}</strong></div>
+            <div><span>Снимки страниц</span><strong>{{ dashboard.technical_counts.snapshots }}</strong></div>
+            <div><span>Фрагменты базы знаний</span><strong>{{ dashboard.technical_counts.knowledge_chunks }}</strong></div>
+            <div><span>AI-классификации</span><strong>{{ dashboard.technical_counts.classifications }}</strong></div>
+            <div><span>AI-отчеты</span><strong>{{ dashboard.technical_counts.reports }}</strong></div>
         </div>
-        {% else %}
-        <div class="empty-state"><p>Событий пока нет.</p></div>
-        {% endif %}
-    </div>
 
-    <div class="technical-block">
-        <h3>Последние page snapshots</h3>
-        {% if recent_snapshots %}
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Path</th>
-                        <th>Title</th>
-                        <th>Language</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for snapshot in recent_snapshots %}
-                    <tr>
-                        <td>{{ snapshot.path }}</td>
-                        <td>{{ snapshot.title[:50] }}</td>
-                        <td>{{ snapshot.language or '-' }}</td>
-                        <td>{{ snapshot.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="action-panel" data-site-id="{{ site.site_id }}">
+            <div>
+                <h3>Ручные действия MVP</h3>
+                <p>Эти действия помогают проверить сбор данных, анализ страницы и генерацию отчета во время разработки.</p>
+            </div>
+            <div class="action-buttons">
+                <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/knowledge/build-latest">
+                    Собрать знания
+                </button>
+                <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/classify">
+                    Классифицировать блоки
+                </button>
+                <button class="btn btn-secondary" data-admin-action="single" data-endpoint="/api/sites/{{ site.site_id }}/reports/generate?days=7">
+                    Создать отчет
+                </button>
+                <button class="btn btn-primary" data-admin-action="sequence" data-endpoints="/api/sites/{{ site.site_id }}/knowledge/build-latest|/api/sites/{{ site.site_id }}/classify|/api/sites/{{ site.site_id }}/reports/generate?days=7">
+                    Полный анализ
+                </button>
+            </div>
+            <div class="admin-action-status" aria-live="polite"></div>
         </div>
-        {% else %}
-        <div class="empty-state"><p>Снимков страниц пока нет.</p></div>
-        {% endif %}
-    </div>
-
-    <div class="technical-block">
-        <h3>Последние knowledge chunks</h3>
-        {% if recent_chunks %}
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Type</th>
-                        <th>Title</th>
-                        <th>Path</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for chunk in recent_chunks %}
-                    <tr>
-                        <td><span class="badge badge-{{ chunk.chunk_type }}">{{ chunk.chunk_type }}</span></td>
-                        <td>{{ chunk.title[:50] }}</td>
-                        <td>{{ chunk.path }}</td>
-                        <td>{{ chunk.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state"><p>Фрагментов базы знаний пока нет.</p></div>
-        {% endif %}
-    </div>
-
-    <div class="technical-block">
-        <h3>Последние classifications</h3>
-        {% if recent_classifications %}
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Category</th>
-                        <th>Confidence</th>
-                        <th>Reason</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for classification in recent_classifications %}
-                    <tr>
-                        <td><span class="badge badge-{{ classification.category }}">{{ classification.category }}</span></td>
-                        <td>{{ "%.0f"|format(classification.confidence * 100) }}%</td>
-                        <td>{{ classification.reason[:50] }}</td>
-                        <td>{{ classification.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state"><p>AI-классификаций пока нет.</p></div>
-        {% endif %}
-    </div>
+    </details>
 </section>
 {% endblock %}

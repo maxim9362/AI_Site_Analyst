@@ -23,6 +23,10 @@ class ClientRepository:
         result = await self.session.execute(select(Client).where(Client.id == client_id))
         return result.scalar_one_or_none()
 
+    async def get_client_by_email(self, email: str) -> Client | None:
+        result = await self.session.execute(select(Client).where(Client.email == email))
+        return result.scalars().first()
+
     async def list_clients(self) -> list[Client]:
         result = await self.session.execute(select(Client))
         return list(result.scalars().all())
