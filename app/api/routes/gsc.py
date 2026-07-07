@@ -112,6 +112,8 @@ async def gsc_oauth_callback(code: str = "", state: str = "", db: AsyncSession =
         return {"status": "error", "message": "Missing code or state parameter"}
     oauth_service = GSCOAuthService(db)
     result = await oauth_service.handle_callback(code, state)
+    if result.get("status") == "ok" and result.get("redirect_to"):
+        return Response(status_code=302, headers={"Location": result["redirect_to"]})
     return result
 
 

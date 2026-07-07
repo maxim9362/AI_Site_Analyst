@@ -443,6 +443,199 @@ tr:hover {
     border: 1px solid #f5c6cb;
 }
 
+.alert-success {
+    background: #dcfce7;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.auth-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    justify-content: space-between;
+    margin-top: 1rem;
+}
+
+.auth-links a {
+    color: #0f766e;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.auth-links a:hover {
+    color: #115e59;
+}
+
+.btn-google {
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #dbe3ea;
+    color: #1f2937;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 1rem;
+    width: 100%;
+}
+
+.btn-google:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #111827;
+}
+
+.auth-divider {
+    align-items: center;
+    color: #94a3b8;
+    display: flex;
+    font-size: 0.82rem;
+    font-weight: 800;
+    gap: 0.8rem;
+    letter-spacing: 0.08em;
+    margin: 0.8rem 0 1rem;
+    text-transform: uppercase;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+    background: #e2e8f0;
+    content: "";
+    flex: 1;
+    height: 1px;
+}
+
+.password-rules {
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    margin: 0.65rem 0 0;
+    padding-left: 1.2rem;
+}
+
+.dev-reset-link {
+    background: #f8fafc;
+    border: 1px solid #dbe3ea;
+    border-radius: 8px;
+    display: grid;
+    gap: 0.35rem;
+    margin: 1rem 0;
+    padding: 0.9rem 1rem;
+}
+
+.dev-reset-link span {
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.dev-reset-link a {
+    color: #0f766e;
+    overflow-wrap: anywhere;
+}
+
+.account-card {
+    margin: 0;
+    max-width: 560px;
+}
+
+.integration-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.integration-card {
+    align-items: flex-start;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-left: 5px solid #94a3b8;
+    border-radius: 8px;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    min-height: 132px;
+    padding: 1.1rem;
+}
+
+.integration-card.is-connected {
+    border-left-color: #16a34a;
+}
+
+.integration-card.is-missing {
+    border-left-color: #ef4444;
+}
+
+.integration-card h3 {
+    color: #1f2937;
+    font-size: 1rem;
+    margin-bottom: 0.35rem;
+}
+
+.integration-card p {
+    color: #64748b;
+    font-size: 0.9rem;
+    line-height: 1.45;
+    margin: 0;
+}
+
+.settings-summary {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 8px;
+    display: grid;
+    gap: 0.8rem;
+    margin-top: 1.25rem;
+    padding: 1rem;
+}
+
+.settings-summary div {
+    display: grid;
+    gap: 0.2rem;
+}
+
+.settings-summary span {
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.settings-summary strong {
+    color: #111827;
+    overflow-wrap: anywhere;
+}
+
+.integration-panel {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-left: 5px solid #0f766e;
+    border-radius: 8px;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    padding: 1.25rem;
+}
+
+.integration-panel h2 {
+    color: #1f2937;
+    margin: 0.25rem 0 0.35rem;
+}
+
+.integration-panel p {
+    color: #64748b;
+    margin: 0;
+    max-width: 760px;
+}
+
+.integration-panel-actions {
+    align-items: center;
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.75rem;
+}
+
 .badge-pageview { background: #cce5ff; color: #004085; }
 .badge-click { background: #d4edda; color: #155724; }
 .badge-scroll { background: #fff3cd; color: #856404; }
@@ -1933,6 +2126,16 @@ code {
     .realtime-chart-tools {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .integration-panel {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .integration-panel-actions,
+    .integration-panel-actions .btn {
+        width: 100%;
     }
 
     .granularity-pill {

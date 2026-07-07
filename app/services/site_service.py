@@ -3,7 +3,6 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.token_crypto import encode_token
 from app.core.config import settings
 from app.repositories.client_repository import ClientRepository
 from app.repositories.site_repository import SiteRepository
@@ -47,8 +46,6 @@ class SiteService:
             site_id,
             site_data,
             user_id=user_id,
-            google_client_id=data.google_client_id,
-            google_client_secret=encode_token(data.google_client_secret),
         )
         return SiteRead.model_validate(site)
 

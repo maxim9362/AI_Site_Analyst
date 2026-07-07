@@ -262,7 +262,19 @@ async def calculate_site_score(
     # Собираем данные.
     analytics = await get_simple_site_analytics(db, public_site_id, days=days)
     gsc_service = GSCService(db)
-    gsc_summary = await gsc_service.get_gsc_summary(public_site_id, normalized)
+    # GSC не поддерживает 24h — данные дневные.
+    if normalized == "24h":
+        gsc_summary = {
+            "period": normalized,
+            "is_connected": False,
+            "message": "SEO не оценивался: Google Search Console доступен только для периодов 7 дней и 30 дней.",
+            "clicks": 0,
+            "impressions": 0,
+            "ctr": 0.0,
+            "position": 0.0,
+        }
+    else:
+        gsc_summary = await gsc_service.get_gsc_summary(public_site_id, normalized)
 
     classification_repository = BlockClassificationRepository(db)
     knowledge_repository = KnowledgeRepository(db)

@@ -58,6 +58,20 @@ class AIReportService:
             parts.append("Google Search Console data is not connected.")
             parts.append("Если Search Console данных нет, не делай выводы про позиции, показы, CTR или SEO-запросы.")
 
+        # Traffic sources context for AI analysis.
+        traffic_sources = analytics.get("traffic_sources", {})
+        utm_campaigns = analytics.get("utm_campaigns", {})
+        if traffic_sources.get("items") or utm_campaigns.get("items"):
+            parts.append("\n=== ИСТОЧНИКИ ТРАФИКА ===")
+            parts.append(json.dumps({
+                "traffic_sources": traffic_sources,
+                "utm_campaigns": utm_campaigns,
+            }, ensure_ascii=False, default=str)[:3000])
+            parts.append(
+                "Если данные по источникам трафика есть, анализируй откуда приходят посетители, "
+                "какие каналы работают лучше и есть ли трафик из мессенджеров или соцсетей."
+            )
+
         parts.append("\n=== PAGESPEED INSIGHTS ===")
         if pagespeed_data:
             parts.append(json.dumps({"pagespeed": pagespeed_data}, ensure_ascii=False, default=str)[:3000])

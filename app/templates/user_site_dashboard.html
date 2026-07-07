@@ -140,6 +140,148 @@
 </section>
 {% endif %}
 
+{% if dashboard.traffic_sources %}
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">Источники трафика</span>
+        <div class="section-title-row">
+            <h2>Откуда пришли посетители</h2>
+            <details class="info-popover">
+                <summary aria-label="Информация о блоке">i</summary>
+                <div>Источник определяется по UTM-меткам, referrer и данным трекера. Это помогает понять, какие каналы приводят людей на сайт.</div>
+            </details>
+        </div>
+        <p>Показывает каналы, через которые пользователи пришли на сайт за выбранный период.</p>
+    </div>
+
+    {% if dashboard.traffic_sources['items'] %}
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Главный источник</span>
+            <strong class="metric-number">{{ dashboard.traffic_sources['items'][0].source | capitalize }}</strong>
+            <p>{{ dashboard.traffic_sources['items'][0].visits }} визитов ({{ dashboard.traffic_sources['items'][0].percent }}%)</p>
+        </div>
+        {% set direct = namespace(v=0, p=0) %}
+        {% set organic = namespace(v=0, p=0) %}
+        {% set social = namespace(v=0, p=0) %}
+        {% for s in dashboard.traffic_sources['items'] %}
+            {% if s.source == 'direct' %}{% set direct.v = s.visits %}{% set direct.p = s.percent %}{% endif %}
+            {% if s.channel_key == 'organic_search' %}{% set organic.v = s.visits + organic.v %}{% set organic.p = s.percent + organic.p %}{% endif %}
+            {% if s.channel_key == 'social' %}{% set social.v = s.visits + social.v %}{% set social.p = s.percent + social.p %}{% endif %}
+        {% endfor %}
+        <div class="metric-card">
+            <span class="metric-label">Прямые заходы</span>
+            <strong class="metric-number">{{ direct.v }}</strong>
+            <p>{{ "%.1f"|format(direct.p) }}% от общего</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Органический поиск</span>
+            <strong class="metric-number">{{ organic.v }}</strong>
+            <p>{{ "%.1f"|format(organic.p) }}% от общего</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Соцсети</span>
+            <strong class="metric-number">{{ social.v }}</strong>
+            <p>{{ "%.1f"|format(social.p) }}% от общего</p>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Источник</th>
+                    <th>Канал</th>
+                    <th>Визиты</th>
+                    <th>Доля</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in dashboard.traffic_sources['items'] %}
+                <tr>
+                    <td>{{ source.source | capitalize }}</td>
+                    <td>{{ source.channel }}</td>
+                    <td>{{ source.visits }}</td>
+                    <td>{{ source.percent }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Пока недостаточно данных об источниках трафика. Они появятся после первых просмотров страниц с установленным трекером.</p>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+{% if dashboard.utm_campaigns['items'] %}
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">UTM кампании</span>
+        <div class="section-title-row">
+            <h2>Кампании с UTM-метками</h2>
+            <details class="info-popover">
+                <summary aria-label="Информация о блоке">i</summary>
+                <div>UTM-метки показывают, из какой рекламной или внешней кампании пришли посетители.</div>
+            </details>
+        </div>
+        <p>Переходы, где в URL были source, medium или campaign.</p>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Medium</th>
+                    <th>Campaign</th>
+                    <th>Visits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for campaign in dashboard.utm_campaigns['items'] %}
+                <tr>
+                    <td>{{ campaign.source or '-' }}</td>
+                    <td>{{ campaign.medium or '-' }}</td>
+                    <td>{{ campaign.campaign or '-' }}</td>
+                    <td>{{ campaign.visits }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="section">
+    <div class="integration-panel">
+        <div>
+            <span class="section-kicker">Google Search Console</span>
+            <h2>Поисковые данные Google</h2>
+            {% if dashboard.gsc_connected %}
+            <p>Search Console подключен. Данные Google можно синхронизировать и использовать в графиках, запросах и AI-анализе.</p>
+            {% elif dashboard.gsc_oauth_configured %}
+            <p>Подключите свой Google-аккаунт, у которого есть доступ к Search Console этого сайта. Секреты платформы пользователю не нужны.</p>
+            {% else %}
+            <p>Подключение Search Console временно недоступно: владелец платформы еще не настроил Google OAuth на сервере.</p>
+            {% endif %}
+        </div>
+        <div class="integration-panel-actions">
+            {% if dashboard.gsc_connected %}
+            <form method="post" action="/sites/{{ site.site_id }}/gsc/sync">
+                <button class="btn btn-primary" type="submit">Синхронизировать Google</button>
+            </form>
+            {% elif dashboard.gsc_oauth_configured %}
+            <a class="btn btn-primary" href="/sites/{{ site.site_id }}/gsc/connect">Подключить Search Console</a>
+            {% else %}
+            <span class="status status-inactive">OAuth не настроен</span>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
 {% if dashboard.tracker_analytics and dashboard.tracker_analytics.realtime_search %}
 <section class="section realtime-search-section">
     <div class="section-heading">

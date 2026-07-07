@@ -7,6 +7,7 @@ from app.models.gsc_search_metric import GSCSearchMetric
 from app.models.knowledge_chunk import KnowledgeChunk
 from app.models.page_snapshot import PageSnapshot
 from app.models.pagespeed_result import PageSpeedResult
+from app.models.password_reset_token import PasswordResetToken
 from app.models.site import Site
 from app.models.user import User
 
@@ -20,6 +21,7 @@ __all__ = [
     "KnowledgeChunk",
     "PageSnapshot",
     "PageSpeedResult",
+    "PasswordResetToken",
     "Site",
     "User",
 ]

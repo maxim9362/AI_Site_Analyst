@@ -1,4 +1,5 @@
 import time
+from datetime import timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, Response, status
 from fastapi.templating import Jinja2Templates
@@ -7,13 +8,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.rate_limit import check_rate_limit
-from app.core.user_auth import USER_COOKIE, get_authenticated_user_id, sign_user_session
+from app.core.user_auth import USER_COOKIE, sign_user_session, verify_user_session_with_timestamp
 from app.db.database import get_db
 from app.schemas.site import UserSiteCreate
 from app.schemas.user import UserCreate
 from app.services.demo_site_bootstrap_service import create_demo_site_for_user
+from app.services.email_service import EmailService
+from app.services.google_auth_service import GoogleAuthError, GoogleAuthService
+from app.services.gsc_oauth_service import GSCOAuthService
+from app.services.gsc_service import GSCService
 from app.services.site_service import SiteService
-from app.services.user_service import UserAlreadyExistsError, UserService
+from app.services.user_service import (
+    CurrentPasswordInvalidError,
+    PasswordPolicyError,
+    PasswordResetTokenInvalidError,
+    UserAlreadyExistsError,
+    UserService,
+)
 from app.services.product_dashboard_service import ProductDashboardService
 from app.services.pagespeed_service import PageSpeedService
 from app.tasks.site_analysis_tasks import run_site_analysis_task
@@ -50,16 +61,44 @@ def _redirect(location: str) -> Response:
     return Response(status_code=302, headers={"Location": location})
 
 
-def _set_user_cookie(response: Response, user_id) -> None:
+def _set_user_cookie(response: Response, user_id, issued_at: int | None = None) -> None:
     response.set_cookie(
         USER_COOKIE,
-        sign_user_session(user_id, int(time.time())),
+        sign_user_session(user_id, issued_at or int(time.time())),
         httponly=True,
         samesite="lax",
         secure=settings.APP_ENV == "production",
         max_age=settings.ADMIN_SESSION_TTL_SECONDS,
         path="/",
     )
+
+
+def _format_password_errors(error: PasswordPolicyError) -> str:
+    return " ".join(error.errors)
+
+
+def _same_password_error() -> str:
+    return "Пароли не совпадают."
+
+
+async def _get_current_user_id(request: Request, db: AsyncSession):
+    verified = verify_user_session_with_timestamp(request.cookies.get(USER_COOKIE, ""))
+    if not verified:
+        return None
+
+    user_id, issued_at = verified
+    user = await UserService(db).get_user_by_id(user_id)
+    if not user or not user.is_active:
+        return None
+
+    changed_at = user.password_changed_at
+    if changed_at:
+        if changed_at.tzinfo is None:
+            changed_at = changed_at.replace(tzinfo=timezone.utc)
+        if issued_at <= int(changed_at.timestamp()):
+            return None
+
+    return user_id
 
 
 def _build_analytics_detail(metric: str, analytics: dict) -> dict | None:
@@ -248,10 +287,14 @@ def _build_pagespeed_detail(result) -> dict:
 
 
 @router.get("/register")
-async def register_page(request: Request):
-    if get_authenticated_user_id(request):
+async def register_page(request: Request, db: AsyncSession = Depends(get_db)):
+    if await _get_current_user_id(request, db):
         return _redirect("/sites")
-    return templates.TemplateResponse(request, "register.html", {"error": None, "email": ""})
+    return templates.TemplateResponse(
+        request,
+        "register.html",
+        {"error": None, "email": "", "google_login_enabled": settings.google_login_configured},
+    )
 
 
 @router.post("/register")
@@ -259,6 +302,7 @@ async def register_submit(
     request: Request,
     email: str = Form(...),
     password: str = Form(...),
+    confirm_password: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
     client_host = request.client.host if request.client else "unknown"
@@ -266,8 +310,24 @@ async def register_submit(
         return templates.TemplateResponse(
             request,
             "register.html",
-            {"error": "Too many attempts. Try again later.", "email": email},
+            {
+                "error": "Too many attempts. Try again later.",
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "error": _same_password_error(),
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     try:
@@ -276,7 +336,11 @@ async def register_submit(
         return templates.TemplateResponse(
             request,
             "register.html",
-            {"error": "Enter a valid email and a password with at least 8 characters.", "email": email},
+            {
+                "error": "Введите корректный email и пароль от 12 до 128 символов.",
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
@@ -287,8 +351,23 @@ async def register_submit(
         return templates.TemplateResponse(
             request,
             "register.html",
-            {"error": "User with this email already exists.", "email": email},
+            {
+                "error": "User with this email already exists.",
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
             status_code=status.HTTP_409_CONFLICT,
+        )
+    except PasswordPolicyError as exc:
+        return templates.TemplateResponse(
+            request,
+            "register.html",
+            {
+                "error": _format_password_errors(exc),
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     demo_site = await create_demo_site_for_user(db, user.id)
@@ -298,10 +377,19 @@ async def register_submit(
 
 
 @router.get("/login")
-async def login_page(request: Request):
-    if get_authenticated_user_id(request):
+async def login_page(request: Request, db: AsyncSession = Depends(get_db)):
+    if await _get_current_user_id(request, db):
         return _redirect("/sites")
-    return templates.TemplateResponse(request, "login.html", {"error": None, "email": ""})
+    return templates.TemplateResponse(
+        request,
+        "login.html",
+        {
+            "error": None,
+            "message": None,
+            "email": "",
+            "google_login_enabled": settings.google_login_configured,
+        },
+    )
 
 
 @router.post("/login")
@@ -316,7 +404,12 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"error": "Too many login attempts. Try again later.", "email": email},
+            {
+                "error": "Too many login attempts. Try again later.",
+                "message": None,
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         )
 
@@ -326,12 +419,174 @@ async def login_submit(
         return templates.TemplateResponse(
             request,
             "login.html",
-            {"error": "Invalid email or password.", "email": email},
+            {
+                "error": "Invalid email or password.",
+                "message": None,
+                "email": email,
+                "google_login_enabled": settings.google_login_configured,
+            },
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
     response = _redirect("/sites")
     _set_user_cookie(response, user.id)
+    return response
+
+
+@router.get("/auth/google/start")
+async def google_auth_start(request: Request):
+    auth_url = GoogleAuthService().get_authorization_url()
+    if not auth_url:
+        return _redirect("/login")
+    return _redirect(auth_url)
+
+
+@router.get("/auth/google/callback")
+async def google_auth_callback(
+    request: Request,
+    code: str = "",
+    state: str = "",
+    db: AsyncSession = Depends(get_db),
+):
+    if not code or not state:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "Google не вернул данные для входа. Попробуйте еще раз.",
+                "message": None,
+                "email": "",
+                "google_login_enabled": settings.google_login_configured,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        profile = GoogleAuthService().fetch_verified_profile(code, state)
+        user, created = await UserService(db).get_or_create_google_user(profile["email"])
+    except GoogleAuthError:
+        return templates.TemplateResponse(
+            request,
+            "login.html",
+            {
+                "error": "Не удалось войти через Google. Попробуйте еще раз.",
+                "message": None,
+                "email": "",
+                "google_login_enabled": settings.google_login_configured,
+            },
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+
+    redirect_to = "/sites"
+    if created:
+        demo_site = await create_demo_site_for_user(db, user.id)
+        if demo_site:
+            redirect_to = f"/sites/{demo_site.site_id}"
+
+    response = _redirect(redirect_to)
+    _set_user_cookie(response, user.id)
+    return response
+
+
+@router.get("/forgot-password")
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse(
+        request,
+        "forgot_password.html",
+        {"error": None, "message": None, "email": "", "reset_link": None},
+    )
+
+
+@router.post("/forgot-password")
+async def forgot_password_submit(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    email: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    client_host = request.client.host if request.client else "unknown"
+    rate_key = f"user-password-reset:{client_host}:{email.strip().lower()}"
+    if not check_rate_limit(rate_key, settings.ADMIN_LOGIN_RATE_LIMIT_PER_MINUTE):
+        return templates.TemplateResponse(
+            request,
+            "forgot_password.html",
+            {
+                "error": "Too many attempts. Try again later.",
+                "message": None,
+                "email": email,
+                "reset_link": None,
+            },
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        )
+
+    token = await UserService(db).create_password_reset_token(email)
+    reset_link = None
+    if token and not settings.is_production:
+        reset_link = f"{settings.APP_BASE_URL.rstrip('/')}/reset-password?token={token}"
+    if token and settings.is_production:
+        reset_url = f"{settings.APP_BASE_URL.rstrip('/')}/reset-password?token={token}"
+        background_tasks.add_task(EmailService().send_password_reset_email, email.strip().lower(), reset_url)
+
+    return templates.TemplateResponse(
+        request,
+        "forgot_password.html",
+        {
+            "error": None,
+            "message": "Если аккаунт существует, мы подготовили ссылку для восстановления пароля.",
+            "email": email,
+            "reset_link": reset_link,
+        },
+    )
+
+
+@router.get("/reset-password")
+async def reset_password_page(request: Request, token: str = ""):
+    return templates.TemplateResponse(
+        request,
+        "reset_password.html",
+        {"error": None, "message": None, "token": token},
+    )
+
+
+@router.post("/reset-password")
+async def reset_password_submit(
+    request: Request,
+    token: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"error": _same_password_error(), "message": None, "token": token},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        user = await UserService(db).reset_password(token, password)
+    except PasswordPolicyError as exc:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {"error": _format_password_errors(exc), "message": None, "token": token},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    except PasswordResetTokenInvalidError:
+        return templates.TemplateResponse(
+            request,
+            "reset_password.html",
+            {
+                "error": "Ссылка восстановления недействительна или устарела. Запросите новую ссылку.",
+                "message": None,
+                "token": "",
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    response = _redirect("/sites")
+    _set_user_cookie(response, user.id, issued_at=int(time.time()) + 1)
     return response
 
 
@@ -342,9 +597,85 @@ async def logout():
     return response
 
 
+@router.get("/account/password")
+async def change_password_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+    return templates.TemplateResponse(
+        request,
+        "change_password.html",
+        {"error": None, "message": None},
+    )
+
+
+@router.post("/account/password")
+async def change_password_submit(
+    request: Request,
+    current_password: str = Form(...),
+    password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            {"error": _same_password_error(), "message": None},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        user = await UserService(db).change_password(user_id, current_password, password)
+    except CurrentPasswordInvalidError:
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            {"error": "Текущий пароль введен неверно.", "message": None},
+            status_code=status.HTTP_401_UNAUTHORIZED,
+        )
+    except PasswordPolicyError as exc:
+        return templates.TemplateResponse(
+            request,
+            "change_password.html",
+            {"error": _format_password_errors(exc), "message": None},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    response = templates.TemplateResponse(
+        request,
+        "change_password.html",
+        {"error": None, "message": "Пароль обновлен. Старые сессии больше не действуют."},
+    )
+    _set_user_cookie(response, user.id, issued_at=int(time.time()) + 1)
+    return response
+
+
+@router.get("/settings/integrations")
+async def integrations_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+    return templates.TemplateResponse(
+        request,
+        "integrations.html",
+        {
+            "integrations": settings.integration_status(),
+            "app_env": settings.APP_ENV,
+            "app_base_url": settings.APP_BASE_URL,
+            "google_redirect_uri": settings.GOOGLE_REDIRECT_URI,
+            "require_external_integrations": settings.REQUIRE_EXTERNAL_INTEGRATIONS,
+        },
+    )
+
+
 @router.get("/sites")
 async def user_sites(request: Request, db: AsyncSession = Depends(get_db)):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -353,8 +684,8 @@ async def user_sites(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/sites/new")
-async def new_site_page(request: Request):
-    if not get_authenticated_user_id(request):
+async def new_site_page(request: Request, db: AsyncSession = Depends(get_db)):
+    if not await _get_current_user_id(request, db):
         return _redirect("/login")
     return templates.TemplateResponse(
         request,
@@ -364,8 +695,6 @@ async def new_site_page(request: Request):
             "name": "",
             "domain": "",
             "allowed_domains": "",
-            "google_client_id": "",
-            "google_client_secret": "",
         },
     )
 
@@ -376,11 +705,9 @@ async def create_user_site(
     name: str = Form(...),
     domain: str = Form(...),
     allowed_domains: str = Form(""),
-    google_client_id: str = Form(...),
-    google_client_secret: str = Form(...),
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -391,8 +718,6 @@ async def create_user_site(
             name=name.strip(),
             domain=domain_value,
             allowed_domains=allowed_domain_values or [domain_value],
-            google_client_id=google_client_id.strip(),
-            google_client_secret=google_client_secret.strip(),
         )
     except ValidationError:
         return templates.TemplateResponse(
@@ -403,8 +728,6 @@ async def create_user_site(
                 "name": name,
                 "domain": domain,
                 "allowed_domains": allowed_domains,
-                "google_client_id": google_client_id,
-                "google_client_secret": "",
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
@@ -415,7 +738,7 @@ async def create_user_site(
 
 @router.get("/sites/{site_id}/install")
 async def site_install_code_page(site_id: str, request: Request, db: AsyncSession = Depends(get_db)):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -439,7 +762,7 @@ async def user_site_dashboard(
     period: str = "7d",
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -467,7 +790,7 @@ async def user_site_analytics_detail(
     period: str = "7d",
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -498,7 +821,7 @@ async def run_user_site_pagespeed(
     strategy: str = Form("mobile"),
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -510,6 +833,36 @@ async def run_user_site_pagespeed(
     return _redirect(f"/sites/{site.site_id}")
 
 
+@router.get("/sites/{site_id}/gsc/connect")
+async def connect_user_site_gsc(site_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    site = await SiteService(db).get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    auth_url = GSCOAuthService(db).get_authorization_url(site.site_id, user_id=user_id)
+    if not auth_url:
+        return _redirect(f"/sites/{site.site_id}?gsc=not_configured")
+    return _redirect(auth_url)
+
+
+@router.post("/sites/{site_id}/gsc/sync")
+async def sync_user_site_gsc(site_id: str, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    site = await SiteService(db).get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    await GSCService(db).sync_gsc_data(site.site_id, period="30d")
+    return _redirect(f"/sites/{site.site_id}")
+
+
 @router.get("/sites/{site_id}/pagespeed/{strategy}")
 async def user_site_pagespeed_detail(
     site_id: str,
@@ -517,7 +870,7 @@ async def user_site_pagespeed_detail(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 
@@ -549,7 +902,7 @@ async def run_user_site_analysis(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    user_id = get_authenticated_user_id(request)
+    user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
 

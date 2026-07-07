@@ -1,0 +1,50 @@
+{% extends "user_base.html" %}
+
+{% block title %}Интеграции — AI Site Analyst{% endblock %}
+
+{% block content %}
+<section class="dashboard-section">
+    <div class="section-heading">
+        <div>
+            <span class="eyebrow">PRODUCTION</span>
+            <h1>Интеграции и реальные токены</h1>
+            <p>Статус переменных сервера. Секретные значения не отображаются.</p>
+        </div>
+    </div>
+
+    <div class="integration-grid">
+        {% for key, item in integrations.items() %}
+        <div class="integration-card {% if item.configured %}is-connected{% else %}is-missing{% endif %}">
+            <div>
+                <h3>{{ item.label }}</h3>
+                <p>{{ item.detail }}</p>
+            </div>
+            {% if item.configured %}
+            <span class="status status-active">Подключено</span>
+            {% else %}
+            <span class="status status-inactive">Не задано</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="settings-summary">
+        <div>
+            <span>APP_ENV</span>
+            <strong>{{ app_env }}</strong>
+        </div>
+        <div>
+            <span>APP_BASE_URL</span>
+            <strong>{{ app_base_url }}</strong>
+        </div>
+        <div>
+            <span>GOOGLE_REDIRECT_URI</span>
+            <strong>{{ google_redirect_uri }}</strong>
+        </div>
+        <div>
+            <span>REQUIRE_EXTERNAL_INTEGRATIONS</span>
+            <strong>{{ require_external_integrations }}</strong>
+        </div>
+    </div>
+</section>
+{% endblock %}

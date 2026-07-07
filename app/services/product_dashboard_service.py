@@ -88,6 +88,8 @@ class ProductDashboardService:
             "period_options": PERIOD_OPTIONS,
             "site_status": site_status,
             "tracker_analytics": simple_analytics,
+            "traffic_sources": simple_analytics.get("traffic_sources", {"items": [], "total": 0}) if simple_analytics else {"items": [], "total": 0},
+            "utm_campaigns": simple_analytics.get("utm_campaigns", {"items": []}) if simple_analytics else {"items": []},
             "gsc_summary": gsc_summary or {
                 "period": period_option["value"],
                 "is_connected": False,
@@ -100,6 +102,7 @@ class ProductDashboardService:
             "gsc_top_queries": gsc_top_queries or [],
             "gsc_time_series": gsc_time_series or [],
             "gsc_connected": gsc_connected,
+            "gsc_oauth_configured": settings.google_oauth_configured,
             "gsc_chart_data": gsc_chart_data,
             "pagespeed": pagespeed,
             "chart_data": chart_data,
@@ -217,12 +220,17 @@ class ProductDashboardService:
         days = period_option["days"]
         is_hourly = days <= 1
         labels = self._build_hourly_labels() if is_hourly else self._build_labels(days)
-        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected else {}
+        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected and not is_hourly else {}
         latest_point = gsc_time_series[-1] if gsc_time_series else {}
-        disabled = not gsc_connected
-        message = "" if gsc_connected else "Google Search Console пока не подключен или данных за период нет."
+        disabled = not gsc_connected or is_hourly
+        if is_hourly:
+            message = "Search Console обновляется по дням. Выберите 7 или 30 дней, чтобы увидеть SEO-данные."
+        elif not gsc_connected:
+            message = "Google Search Console пока не подключен или данных за период нет."
+        else:
+            message = ""
         note = (
-            "Search Console обновляет SEO-данные по дням. В периоде 24 часа график показывает последний доступный дневной срез на почасовой шкале."
+            "Search Console обновляет SEO-данные по дням. В периоде 24 часа SEO-метрики недоступны."
             if is_hourly
             else "Каждая точка на графике соответствует одному дню выбранного периода."
         )
@@ -293,10 +301,15 @@ class ProductDashboardService:
     ) -> dict[str, Any]:
         labels = realtime_search.get("labels", [])
         is_hourly = period_option["days"] <= 1
-        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected else {}
+        gsc_by_day = {point["date"]: point for point in gsc_time_series} if gsc_connected and not is_hourly else {}
         latest_point = gsc_time_series[-1] if gsc_time_series else {}
-        disabled = not gsc_connected
-        message = "" if gsc_connected else "Google Search Console пока не подключен или данных за период нет."
+        disabled = not gsc_connected or is_hourly
+        if is_hourly:
+            message = "Search Console обновляется по дням. Выберите 7 или 30 дней, чтобы увидеть SEO-данные."
+        elif not gsc_connected:
+            message = "Google Search Console пока не подключен или данных за период нет."
+        else:
+            message = ""
 
         def values_for(key: str) -> list[float | int | None]:
             if disabled:

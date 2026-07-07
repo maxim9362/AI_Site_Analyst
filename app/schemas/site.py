@@ -15,8 +15,7 @@ class SiteCreate(SiteBase):
 
 
 class UserSiteCreate(SiteBase):
-    google_client_id: str = Field(min_length=1, max_length=255)
-    google_client_secret: str = Field(min_length=1, max_length=500)
+    pass
 
 
 class SiteRead(SiteBase):

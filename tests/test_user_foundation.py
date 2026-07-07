@@ -125,3 +125,9 @@ class UserMigrationTests(unittest.TestCase):
         self.assertIn('"key": "google_clicks"', source)
         self.assertIn('"key": "google_position"', source)
         self.assertIn('"info": "Сколько переходов на сайт пришло из результатов поиска Google."', source)
+
+    def test_traffic_sources_prioritize_utm_before_referrer(self):
+        source = Path("app/services/simple_analytics_service.py").read_text(encoding="utf-8")
+
+        self.assertIn("def _host_matches", source)
+        self.assertLess(source.index("from_url = _detect_source_from_url"), source.index("from_ref = _detect_source_from_referrer"))

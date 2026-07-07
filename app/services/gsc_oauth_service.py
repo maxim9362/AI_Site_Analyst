@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import logging
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -19,21 +20,28 @@ def _get_state_secret() -> str:
     return settings.ADMIN_SESSION_SECRET or settings.ADMIN_DASHBOARD_PASSWORD
 
 
-def _sign_state(public_site_id: str) -> str:
-    """Create signed state with public_site_id and timestamp."""
-    payload = f"{public_site_id}:{int(time.time())}"
+def _sign_state(public_site_id: str, user_id: uuid.UUID | None = None) -> str:
+    """Create signed state with public_site_id, optional user_id and timestamp."""
+    user_part = str(user_id) if user_id else "-"
+    payload = f"{public_site_id}:{user_part}:{int(time.time())}"
     secret = _get_state_secret()
     signature = hmac.new(secret.encode(), payload.encode(), hashlib.sha256).hexdigest()[:16]
     return f"{payload}:{signature}"
 
 
-def _verify_state(state: str) -> str | None:
-    """Verify signed state and extract public_site_id. Returns None if invalid."""
+def _verify_state(state: str) -> tuple[str, uuid.UUID | None] | None:
+    """Verify signed state and extract public_site_id/user_id. Returns None if invalid."""
     parts = state.split(":")
-    if len(parts) != 3:
+    if len(parts) == 3:
+        public_site_id, ts_str, signature = parts
+        user_part = "-"
+        expected_payload = f"{public_site_id}:{ts_str}"
+    elif len(parts) == 4:
+        public_site_id, user_part, ts_str, signature = parts
+        expected_payload = f"{public_site_id}:{user_part}:{ts_str}"
+    else:
         return None
-    public_site_id, ts_str, signature = parts
-    expected_payload = f"{public_site_id}:{ts_str}"
+
     secret = _get_state_secret()
     expected_sig = hmac.new(secret.encode(), expected_payload.encode(), hashlib.sha256).hexdigest()[:16]
     if not hmac.compare_digest(signature, expected_sig):
@@ -44,7 +52,15 @@ def _verify_state(state: str) -> str | None:
         return None
     if time.time() - ts > 600:
         return None
-    return public_site_id
+
+    user_id = None
+    if user_part != "-":
+        try:
+            user_id = uuid.UUID(user_part)
+        except ValueError:
+            return None
+
+    return public_site_id, user_id
 
 
 class GSCOAuthService:
@@ -55,7 +71,7 @@ class GSCOAuthService:
         self.site_repository = SiteRepository(session)
         self.gsc_repository = GSCRepository(session)
 
-    def get_authorization_url(self, public_site_id: str) -> str | None:
+    def get_authorization_url(self, public_site_id: str, user_id: uuid.UUID | None = None) -> str | None:
         """Generate Google OAuth authorization URL with signed state.
 
         Returns None if Google credentials are not configured.
@@ -77,7 +93,7 @@ class GSCOAuthService:
             scopes=settings.GOOGLE_SCOPES.split(","),
         )
         flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
-        state = _sign_state(public_site_id)
+        state = _sign_state(public_site_id, user_id=user_id)
         authorization_url, _ = flow.authorization_url(
             access_type="offline",
             include_granted_scopes="true",
@@ -87,9 +103,10 @@ class GSCOAuthService:
 
     async def handle_callback(self, code: str, state: str) -> dict[str, Any]:
         """Exchange authorization code for tokens and save to GSC property."""
-        public_site_id = _verify_state(state)
-        if not public_site_id:
+        verified_state = _verify_state(state)
+        if not verified_state:
             return {"status": "error", "message": "Invalid or expired OAuth state"}
+        public_site_id, state_user_id = verified_state
 
         if not settings.google_oauth_configured:
             return {"status": "error", "message": "Google OAuth credentials are not configured"}
@@ -97,6 +114,8 @@ class GSCOAuthService:
         site = await self.site_repository.get_site_by_site_id(public_site_id)
         if not site:
             return {"status": "error", "message": "Site not found"}
+        if state_user_id and site.user_id != state_user_id:
+            return {"status": "error", "message": "Site does not belong to OAuth user"}
 
         try:
             from google_auth_oauthlib.flow import Flow
@@ -150,6 +169,7 @@ class GSCOAuthService:
             "site_id": public_site_id,
             "google_account_email": google_email,
             "property_url": property_obj.property_url,
+            "redirect_to": f"/sites/{public_site_id}" if state_user_id else None,
         }
 
     async def refresh_token_if_needed(self, site_id) -> bool:

@@ -20,7 +20,7 @@ def sign_user_session(user_id: uuid.UUID, timestamp: int) -> str:
     return f"{payload}:{signature}"
 
 
-def verify_user_session(cookie_value: str) -> uuid.UUID | None:
+def verify_user_session_with_timestamp(cookie_value: str) -> tuple[uuid.UUID, int] | None:
     if not cookie_value:
         return None
 
@@ -46,7 +46,14 @@ def verify_user_session(cookie_value: str) -> uuid.UUID | None:
     if not hmac.compare_digest(signature, expected_signature):
         return None
 
-    return user_id
+    return user_id, timestamp
+
+
+def verify_user_session(cookie_value: str) -> uuid.UUID | None:
+    verified = verify_user_session_with_timestamp(cookie_value)
+    if not verified:
+        return None
+    return verified[0]
 
 
 def get_authenticated_user_id(request: Request) -> uuid.UUID | None:

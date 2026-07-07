@@ -79,6 +79,108 @@
     return text.length > maxLength ? text.substring(0, maxLength) : text;
   }
 
+  // Traffic source detection: UTM > referrer > direct
+  function detectTrafficSource() {
+    var url = new URL(window.location.href);
+    var utmSource = url.searchParams.get('utm_source');
+    var utmMedium = url.searchParams.get('utm_medium');
+    var utmCampaign = url.searchParams.get('utm_campaign');
+    var utmTerm = url.searchParams.get('utm_term');
+    var utmContent = url.searchParams.get('utm_content');
+
+    var referrer = document.referrer || '';
+    var referrerLower = referrer.toLowerCase();
+    var referrerHost = '';
+    if (referrerLower) {
+      try {
+        referrerHost = new URL(referrer).hostname.toLowerCase();
+      } catch (e) {}
+    }
+
+    var source = null;
+    var channel = 'direct';
+
+    // Priority 1: UTM source
+    if (utmSource) {
+      source = utmSource.toLowerCase();
+      channel = utmMedium ? utmMedium.toLowerCase() : 'unknown';
+    }
+
+    // Priority 2: Referrer-based detection
+    if (!source && referrerHost) {
+      // Google
+      if (referrerHost.indexOf('google.') !== -1 || referrerHost === 'google') {
+        source = 'google';
+        channel = 'organic_search';
+      }
+      // Facebook
+      else if (referrerHost.indexOf('facebook.com') !== -1 || referrerHost === 'fb.com' ||
+               referrerHost === 'l.facebook.com' || referrerHost === 'm.facebook.com') {
+        source = 'facebook';
+        channel = 'social';
+      }
+      // Instagram
+      else if (referrerHost.indexOf('instagram.com') !== -1 || referrerHost === 'l.instagram.com') {
+        source = 'instagram';
+        channel = 'social';
+      }
+      // WhatsApp
+      else if (referrerHost.indexOf('whatsapp') !== -1 || referrerLower.indexOf('wa.me') !== -1) {
+        source = 'whatsapp';
+        channel = 'messenger';
+      }
+      // Telegram
+      else if (referrerHost.indexOf('telegram') !== -1 || referrerHost === 't.me') {
+        source = 'telegram';
+        channel = 'messenger';
+      }
+      // Unknown referrer -> referral
+      else {
+        source = referrerHost;
+        channel = 'referral';
+      }
+    }
+
+    // Priority 3: Direct
+    if (!source) {
+      source = 'direct';
+      channel = 'direct';
+    }
+
+    // Check UTM source override for messenger channels
+    if (utmSource) {
+      var utmLower = utmSource.toLowerCase();
+      if (utmLower.indexOf('whatsapp') !== -1 || utmLower.indexOf('wa') !== -1) {
+        source = 'whatsapp';
+        if (channel === 'direct' || channel === 'unknown') channel = 'messenger';
+      } else if (utmLower.indexOf('telegram') !== -1 || utmLower.indexOf('tg') !== -1) {
+        source = 'telegram';
+        if (channel === 'direct' || channel === 'unknown') channel = 'messenger';
+      } else if (utmLower.indexOf('facebook') !== -1 || utmLower.indexOf('fb') !== -1) {
+        source = 'facebook';
+        if (channel === 'direct' || channel === 'unknown') channel = 'social';
+      } else if (utmLower.indexOf('instagram') !== -1 || utmLower.indexOf('ig') !== -1) {
+        source = 'instagram';
+        if (channel === 'direct' || channel === 'unknown') channel = 'social';
+      } else if (utmLower.indexOf('google') !== -1) {
+        source = 'google';
+        if (channel === 'direct' || channel === 'unknown') channel = 'organic_search';
+      }
+    }
+
+    return {
+      traffic_source: source,
+      traffic_channel: channel,
+      traffic_campaign: utmCampaign || null,
+      utm_source: utmSource || null,
+      utm_medium: utmMedium || null,
+      utm_campaign: utmCampaign || null,
+      utm_term: utmTerm || null,
+      utm_content: utmContent || null,
+      referrer_host: referrerHost || null
+    };
+  }
+
   // Send event to server
   function sendEvent(eventType, metadata) {
     var siteId = getSiteId();
@@ -323,7 +425,7 @@
 
   // Track pageview
   function trackPageview() {
-    sendEvent('pageview', {});
+    sendEvent('pageview', detectTrafficSource());
   }
 
   // Track clicks

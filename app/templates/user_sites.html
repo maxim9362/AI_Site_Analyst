@@ -19,7 +19,6 @@
                 <th>Название</th>
                 <th>Домен</th>
                 <th>Site ID</th>
-                <th>Google API</th>
                 <th>Статус</th>
                 <th></th>
             </tr>
@@ -30,13 +29,6 @@
                 <td><a class="back-link" href="/sites/{{ site.site_id }}">{{ site.name }}</a></td>
                 <td>{{ site.domain }}</td>
                 <td><code>{{ site.site_id }}</code></td>
-                <td>
-                    {% if site.google_client_id %}
-                    <span class="status status-active">Подключен</span>
-                    {% else %}
-                    <span class="status status-inactive">Не задан</span>
-                    {% endif %}
-                </td>
                 <td>
                     {% if site.is_active %}
                     <span class="status status-active">Активен</span>

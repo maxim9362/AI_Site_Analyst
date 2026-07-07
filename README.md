@@ -198,6 +198,46 @@ curl -X POST "http://localhost:8000/api/sites/SITE_ID/gsc/demo-data?days=30"
 
 GSC данные дневные. Period `24h` не поддерживается для GSC метрик.
 
+## Traffic Sources
+
+AI Site Analyst определяет источники трафика по UTM-параметрам и `document.referrer`.
+
+### Приоритет определения
+
+```text
+UTM > referrer > direct
+```
+
+### Поддерживаемые источники
+
+- **Google** — organic search (referrer содержит `google.`)
+- **Facebook** — social (referrer: `facebook.com`, `fb.com`, `l.facebook.com`, `m.facebook.com`)
+- **Instagram** — social (referrer: `instagram.com`, `l.instagram.com`)
+- **WhatsApp** — messenger (referrer/utm_source содержит `whatsapp` или `wa.me`)
+- **Telegram** — messenger (referrer/utm_source содержит `telegram` или `t.me`)
+- **Direct** — прямой заход (referrer пустой, UTM нет)
+- **Referral** — другие сайты (referrer есть, но не подходит под известные)
+- **Other** — другие источники
+
+### Пример URL с UTM
+
+```text
+https://example.com/?utm_source=facebook&utm_medium=social&utm_campaign=test
+```
+
+### Данные в dashboard
+
+- **Откуда пришли посетители** — таблица источников с каналом, визитами и долей
+- **UTM-кампании** — таблица кампаний с source, medium, campaign и визитами
+- **Карточки**: главный источник, прямые заходы, органический поиск, соцсети
+
+### Ограничения
+
+- Не собирает данные из Facebook API, Google Ads API или Instagram API
+- UTM-параметры берутся только из URL текущей страницы
+- Полный query string текущей страницы НЕ сохраняется (privacy)
+- Значения форм НЕ собираются
+
 ## AI-отчёты
 
 AI получает: tracker analytics, цели, воронку, knowledge base, классификации, GSC данные.

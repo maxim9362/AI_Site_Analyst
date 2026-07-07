@@ -10,6 +10,160 @@ from app.repositories.event_repository import EventRepository
 from app.repositories.site_repository import SiteRepository
 
 
+TRAFFIC_CHANNEL_LABELS = {
+    "organic_search": "Organic Search",
+    "social": "Social",
+    "messenger": "Messenger",
+    "direct": "Direct",
+    "referral": "Referral",
+}
+
+
+def _host_matches(host: str, domain: str) -> bool:
+    return host == domain or host.endswith(f".{domain}")
+
+
+def _detect_source_from_referrer(referrer: str | None) -> tuple[str, str] | None:
+    """Fallback: определяем источник по URL referrer (для событий без traffic_source metadata)."""
+    if not referrer:
+        return None
+    try:
+        host = urlparse(referrer).netloc.lower()
+    except Exception:
+        return None
+    if not host:
+        return None
+    if "google." in host:
+        return "google", "organic_search"
+    if _host_matches(host, "facebook.com") or _host_matches(host, "fb.com"):
+        return "facebook", "social"
+    if _host_matches(host, "instagram.com"):
+        return "instagram", "social"
+    if "whatsapp" in host or "wa.me" in host:
+        return "whatsapp", "messenger"
+    if "telegram" in host or _host_matches(host, "t.me"):
+        return "telegram", "messenger"
+    return host, "referral"
+
+
+def _detect_source_from_url(url: str | None) -> tuple[str, str] | None:
+    """Fallback: определяем источник по UTM-параметрам в URL (для событий без metadata)."""
+    if not url:
+        return None
+    try:
+        params = parse_qs(urlparse(url).query)
+    except Exception:
+        return None
+    utm_source = (params.get("utm_source", [""])[0] or "").strip().lower()
+    utm_medium = (params.get("utm_medium", [""])[0] or "").strip().lower()
+    if not utm_source:
+        return None
+    source = utm_source
+    channel = utm_medium if utm_medium else "unknown"
+    # Normalize known channels.
+    if source in ("facebook", "fb"):
+        source, channel = "facebook", "social"
+    elif source in ("instagram", "ig"):
+        source, channel = "instagram", "social"
+    elif source in ("whatsapp", "wa"):
+        source, channel = "whatsapp", "messenger"
+    elif source in ("telegram", "tg"):
+        source, channel = "telegram", "messenger"
+    elif source == "google":
+        channel = "organic_search"
+    return source, channel
+
+
+def _resolve_traffic_source(event: Event) -> tuple[str, str]:
+    """Определяет source и channel для pageview-события.
+
+    Приоритет: metadata.traffic_source > metadata via event.referrer/url > event.referrer > event.url > direct.
+    """
+    meta = _metadata(event)
+
+    # 1. Новый tracker прислал traffic_source в metadata.
+    source = (meta.get("traffic_source") or "").strip().lower()
+    channel = (meta.get("traffic_channel") or "").strip().lower()
+    if source:
+        return source, channel or "unknown"
+
+    # 2. Fallback: UTM из metadata.
+    utm_source = (meta.get("utm_source") or "").strip().lower()
+    utm_medium = (meta.get("utm_medium") or "").strip().lower()
+    if utm_source:
+        return utm_source, utm_medium or "unknown"
+
+    # 3. Fallback: UTM из URL события (старый tracker).
+    from_url = _detect_source_from_url(event.url)
+    if from_url:
+        return from_url
+
+    # 4. Fallback: referrer из события.
+    from_ref = _detect_source_from_referrer(event.referrer)
+    if from_ref:
+        return from_ref
+
+    # 5. Direct.
+    return "direct", "direct"
+
+
+def _build_traffic_sources(pageview_events: list[Event]) -> dict[str, Any]:
+    source_counter: Counter[tuple[str, str]] = Counter()
+    for event in pageview_events:
+        source, channel = _resolve_traffic_source(event)
+        source_counter[(source, channel)] += 1
+
+    total = sum(source_counter.values())
+    items = []
+    for (source, channel), count in source_counter.most_common(10):
+        items.append({
+            "source": source,
+            "channel": TRAFFIC_CHANNEL_LABELS.get(channel, channel),
+            "channel_key": channel,
+            "visits": count,
+            "percent": round(count / total * 100, 1) if total > 0 else 0.0,
+        })
+
+    return {"items": items, "total": total}
+
+
+def _build_utm_campaigns(pageview_events: list[Event]) -> dict[str, Any]:
+    campaign_counter: Counter[tuple[str, str, str]] = Counter()
+    for event in pageview_events:
+        meta = _metadata(event)
+        utm_source = meta.get("utm_source")
+        utm_medium = meta.get("utm_medium")
+        utm_campaign = meta.get("utm_campaign")
+        # Fallback: извлекаем UTM из URL события, если в metadata нет.
+        if not utm_source and not utm_medium and not utm_campaign and event.url:
+            try:
+                params = parse_qs(urlparse(event.url).query)
+                utm_source = params.get("utm_source", [""])[0] or None
+                utm_medium = params.get("utm_medium", [""])[0] or None
+                utm_campaign = params.get("utm_campaign", [""])[0] or None
+            except Exception:
+                pass
+        if not utm_source and not utm_medium and not utm_campaign:
+            continue
+        key = (
+            (utm_source or "").strip().lower(),
+            (utm_medium or "").strip().lower(),
+            (utm_campaign or "").strip().lower(),
+        )
+        campaign_counter[key] += 1
+
+    items = []
+    for (source, medium, campaign), count in campaign_counter.most_common(10):
+        items.append({
+            "source": source,
+            "medium": medium,
+            "campaign": campaign,
+            "visits": count,
+        })
+
+    return {"items": items}
+
+
 def _build_timeseries(
     events: list[Event],
     days: int,
@@ -107,6 +261,8 @@ def _empty_analytics(days: int, message: str) -> dict[str, Any]:
             "top_user_agents": [],
         },
         "realtime_search": _build_realtime_search_analytics([], [], days),
+        "traffic_sources": {"items": [], "total": 0},
+        "utm_campaigns": {"items": []},
     }
 
 
@@ -449,6 +605,8 @@ async def get_simple_site_analytics(
         )
         empty["timeseries"] = {"labels": [], "site_visits": [], "pageviews": []}
         empty["realtime_search"] = _build_realtime_search_analytics([], [], days)
+        empty["traffic_sources"] = {"items": [], "total": 0}
+        empty["utm_campaigns"] = {"items": []}
         return empty
 
     human_events = [event for event in events if not _is_bot_event(event)]
@@ -525,4 +683,6 @@ async def get_simple_site_analytics(
         "timeseries": _build_timeseries(human_events, days),
         "bots": _build_bot_stats(bot_events),
         "realtime_search": _build_realtime_search_analytics(human_events, bot_events, days),
+        "traffic_sources": _build_traffic_sources(pageview_events),
+        "utm_campaigns": _build_utm_campaigns(pageview_events),
     }

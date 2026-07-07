@@ -253,10 +253,36 @@
     <div class="section-heading">
         <span class="section-kicker">Google Search Console</span>
         <h2>Поисковые запросы</h2>
+        {% if dashboard.period == '24h' %}
+        <p>Search Console обновляется по дням. Выберите 7 или 30 дней, чтобы увидеть SEO-данные.</p>
+        {% else %}
         <p>Запросы, по которым сайт показывался в Google.</p>
+        {% endif %}
     </div>
 
     <div class="product-metrics">
+        {% if dashboard.period == '24h' %}
+        <div class="metric-card">
+            <span class="metric-label">SEO показы</span>
+            <strong class="metric-number">—</strong>
+            <p>Нет данных за 24 часа</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">SEO клики</span>
+            <strong class="metric-number">—</strong>
+            <p>Нет данных за 24 часа</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">CTR</span>
+            <strong class="metric-number">—</strong>
+            <p>Нет данных за 24 часа</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Средняя позиция</span>
+            <strong class="metric-number">—</strong>
+            <p>Нет данных за 24 часа</p>
+        </div>
+        {% else %}
         <div class="metric-card">
             <span class="metric-label">SEO показы</span>
             <strong class="metric-number">{{ dashboard.gsc_summary.impressions }}</strong>
@@ -277,6 +303,12 @@
             <strong class="metric-number">{{ "%.1f"|format(dashboard.gsc_summary.position) }}</strong>
             <p>Среднее место сайта в выдаче</p>
         </div>
+        {% endif %}
+    </div>
+
+    <div class="chart-note">
+        <p><strong>Клики Google</strong> — это переходы из поиска Google по данным Search Console. <strong>Посетители</strong> — это реальные визиты, которые зафиксировал tracker.js.</p>
+        <p class="chart-note-hint">Если Google clicks больше посетителей, возможно tracker был подключён позже, установлен не на всех страницах или часть визитов была заблокирована браузером.</p>
     </div>
 
     <div class="table-container query-table">
@@ -308,6 +340,107 @@
         {% endif %}
     </div>
 </section>
+
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">Источники трафика</span>
+        <h2>Откуда пришли посетители</h2>
+        <p>Определяется по UTM-параметрам и document.referrer.</p>
+    </div>
+
+    {% if dashboard.traffic_sources['items'] %}
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Источник</th>
+                    <th>Канал</th>
+                    <th>Визиты</th>
+                    <th>Доля</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for source in dashboard.traffic_sources['items'] %}
+                <tr>
+                    <td>{{ source.source | capitalize }}</td>
+                    <td>{{ source.channel }}</td>
+                    <td>{{ source.visits }}</td>
+                    <td>{{ source.percent }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="product-metrics">
+        <div class="metric-card">
+            <span class="metric-label">Главный источник</span>
+            <strong class="metric-number">{{ dashboard.traffic_sources['items'][0].source | capitalize if dashboard.traffic_sources['items'] else '—' }}</strong>
+            <p>{{ dashboard.traffic_sources['items'][0].visits }} визитов ({{ dashboard.traffic_sources['items'][0].percent }}%)</p>
+        </div>
+        {% set direct = namespace(v=0, p=0) %}
+        {% set organic = namespace(v=0, p=0) %}
+        {% set social = namespace(v=0, p=0) %}
+        {% for s in dashboard.traffic_sources['items'] %}
+            {% if s.source == 'direct' %}{% set direct.v = s.visits %}{% set direct.p = s.percent %}{% endif %}
+            {% if s.channel_key == 'organic_search' %}{% set organic.v = s.visits %}{% set organic.p = s.percent %}{% endif %}
+            {% if s.channel_key == 'social' %}{% set social.v = s.visits + social.v %}{% set social.p = s.percent + social.p %}{% endif %}
+        {% endfor %}
+        <div class="metric-card">
+            <span class="metric-label">Прямые заходы</span>
+            <strong class="metric-number">{{ direct.v }}</strong>
+            <p>{{ direct.p }}% от общего</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Органический поиск</span>
+            <strong class="metric-number">{{ organic.v }}</strong>
+            <p>{{ organic.p }}% от общего</p>
+        </div>
+        <div class="metric-card">
+            <span class="metric-label">Соцсети</span>
+            <strong class="metric-number">{{ social.v }}</strong>
+            <p>{{ social.p }}% от общего</p>
+        </div>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>Пока недостаточно данных об источниках трафика.</p>
+    </div>
+    {% endif %}
+</section>
+
+{% if dashboard.utm_campaigns['items'] %}
+<section class="section">
+    <div class="section-heading">
+        <span class="section-kicker">UTM кампании</span>
+        <h2>UTM-кампании</h2>
+        <p>Переходы с UTM-метками.</p>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    <th>Medium</th>
+                    <th>Campaign</th>
+                    <th>Visits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for campaign in dashboard.utm_campaigns['items'] %}
+                <tr>
+                    <td>{{ campaign.source }}</td>
+                    <td>{{ campaign.medium }}</td>
+                    <td>{{ campaign.campaign or '—' }}</td>
+                    <td>{{ campaign.visits }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
 
 <section class="section">
     <div class="ai-report-card">
