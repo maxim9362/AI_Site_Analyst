@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.token_crypto import decode_token, encode_token
 from app.repositories.gsc_repository import GSCRepository
 from app.repositories.site_repository import SiteRepository
+from app.services.url_normalization import normalize_gsc_property_url
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,7 @@ class GSCOAuthService:
                 }
             },
             scopes=settings.GOOGLE_SCOPES.split(","),
+            autogenerate_code_verifier=False,
         )
         flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
         state = _sign_state(public_site_id, user_id=user_id)
@@ -130,6 +132,7 @@ class GSCOAuthService:
                     }
                 },
                 scopes=settings.GOOGLE_SCOPES.split(","),
+                autogenerate_code_verifier=False,
             )
             flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
             flow.fetch_token(code=code)
@@ -139,18 +142,24 @@ class GSCOAuthService:
             return {"status": "error", "message": f"Token exchange failed: {str(e)[:200]}"}
 
         google_email = None
-        try:
-            from googleapiclient.discovery import build
-            oauth_service = build("oauth2", "v2", credentials=credentials)
-            user_info = oauth_service.userinfo().get().execute()
-            google_email = user_info.get("email")
-        except Exception:
-            logger.warning("Could not fetch Google user email")
+        credential_scopes = set(credentials.scopes or [])
+        if credential_scopes.intersection({"openid", "email", "profile", "https://www.googleapis.com/auth/userinfo.email"}):
+            try:
+                from googleapiclient.discovery import build
+                oauth_service = build("oauth2", "v2", credentials=credentials)
+                user_info = oauth_service.userinfo().get().execute()
+                google_email = user_info.get("email")
+            except Exception:
+                logger.warning("Could not fetch Google user email")
 
         property_obj = await self.gsc_repository.get_property_by_site(site.id)
         if not property_obj:
-            property_url = f"https://{site.domain}/" if "." in site.domain else "https://localhost/"
+            property_url = normalize_gsc_property_url(site.domain if "." in site.domain else "localhost")
             property_obj = await self.gsc_repository.create_or_update_property(site.id, site.site_id, property_url)
+        else:
+            normalized_property_url = normalize_gsc_property_url(property_obj.property_url)
+            if normalized_property_url != property_obj.property_url:
+                property_obj.property_url = normalized_property_url
 
         await self.gsc_repository.update_oauth_tokens(
             property_obj,

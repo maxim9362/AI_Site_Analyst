@@ -3,18 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Регистрация — AI Site Analyst</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Регистрация - AI Site Analyst</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check3">
 </head>
-<body>
-    <nav class="navbar">
-        <div class="nav-brand"><a href="/">AI Site Analyst</a></div>
-        <div class="nav-links"><a href="/login">Вход</a></div>
+<body class="auth-body">
+    <nav class="navbar auth-navbar">
+        <div class="nav-brand">
+            <a href="/" aria-label="AI Site Analyst">
+                <span class="brand-mark">AI</span>
+                <span class="brand-full">AI Site Analyst</span>
+                <span class="brand-short">AI Analyst</span>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="/">Проверить сайт бесплатно</a>
+            <a href="/login">Вход</a>
+        </div>
     </nav>
-    <main class="container">
-        <div class="login-card">
+    <main class="auth-shell">
+        <section class="login-card auth-card">
+            <span class="eyebrow">Новый аккаунт</span>
             <h1>Регистрация</h1>
-            <p>Создайте аккаунт, чтобы подключать сайты и смотреть аналитику.</p>
+            <p>Создайте аккаунт, чтобы подключать сайты и получать AI-рекомендации.</p>
+            <div class="auth-free-check-card">
+                <strong>Можно начать без регистрации</strong>
+                <span>Проверьте сайт бесплатно, а потом подключите полный анализ.</span>
+                <a href="/">Открыть проверку сайта</a>
+            </div>
+            {% if site_url %}
+            <div class="alert alert-success">После регистрации подключите сайт: {{ site_url }}</div>
+            {% endif %}
             {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
             {% if google_login_enabled %}
             <a class="btn btn-google" href="/auth/google/start">Зарегистрироваться через Google</a>
@@ -42,9 +61,10 @@
                 <button type="submit" class="btn btn-primary">Создать аккаунт</button>
             </form>
             <div class="auth-links">
+                <a href="/">Проверить другой сайт бесплатно</a>
                 <a href="/login">Уже есть аккаунт?</a>
             </div>
-        </div>
+        </section>
     </main>
 </body>
 </html>

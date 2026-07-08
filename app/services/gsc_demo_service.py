@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.repositories.gsc_repository import GSCRepository
 from app.repositories.site_repository import SiteRepository
+from app.services.url_normalization import normalize_gsc_property_url
 
 DEMO_QUERIES = [
     "нотариус ашдод",
@@ -93,7 +94,7 @@ async def create_demo_gsc_data(
         return {"status": "error", "message": "Site not found"}
 
     # Создаём или обновляем property.
-    property_url = f"https://{site.domain}/" if "." in site.domain else f"https://localhost/"
+    property_url = normalize_gsc_property_url(site.domain if "." in site.domain else "localhost")
     property_obj = await gsc_repository.create_or_update_property(site.id, site.site_id, property_url)
     property_obj.is_connected = True
     property_obj.last_sync_at = datetime.now(timezone.utc)

@@ -129,12 +129,39 @@ REPORT_RESPONSE_SCHEMA = {
 
 class AIService:
     def __init__(self):
+        self.model_name = settings.GEMINI_MODEL
         if settings.GEMINI_API_KEY:
             genai.configure(api_key=settings.GEMINI_API_KEY)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self.model = genai.GenerativeModel(self.model_name)
         else:
             self.model = None
             logger.warning("Gemini API key not configured; using local fallback analysis")
+
+    def _model_names(self) -> list[str]:
+        names = [self.model_name]
+        names.extend(
+            item.strip()
+            for item in settings.GEMINI_FALLBACK_MODELS.split(",")
+            if item.strip()
+        )
+        names.extend(["gemini-flash-lite-latest", "gemini-2.0-flash-lite", "gemini-flash-latest"])
+        return list(dict.fromkeys(names))
+
+    def _generate_content(self, parts: list[str], generation_config: genai.GenerationConfig):
+        last_error = None
+        for model_name in self._model_names():
+            try:
+                model = self.model if model_name == self.model_name else genai.GenerativeModel(model_name)
+                response = model.generate_content(parts, generation_config=generation_config)
+                if model_name != self.model_name:
+                    logger.warning("Gemini model %s failed; using fallback model %s", self.model_name, model_name)
+                    self.model_name = model_name
+                    self.model = model
+                return response
+            except Exception as exc:
+                last_error = exc
+                logger.warning("Gemini model %s failed: %s", model_name, exc)
+        raise last_error or RuntimeError("Gemini generation failed")
 
     def _match_any(self, text: str, markers: tuple[str, ...]) -> bool:
         return any(marker in text for marker in markers)
@@ -200,7 +227,14 @@ class AIService:
         has_gsc = "GOOGLE SEARCH CONSOLE" in context and "is_connected" in context and '"is_connected": true' in context
 
         if funnel["pageviews"] == 0:
+            weaknesses.append("Нет поведенческих данных за выбранный период: AI не может надежно оценить путь пользователя.")
             missing_information.append("Нет просмотров страниц за выбранный период.")
+            recommendations.append({
+                "priority": "high",
+                "title": "Проверить установку трекера и период отчета",
+                "reason": "За выбранный период не зафиксированы просмотры страниц, поэтому отчет не видит реальные действия посетителей.",
+                "expected_effect": "После появления событий AI сможет анализировать поведение, клики, цели и проблемные места.",
+            })
         if "Цены" in context or "цены" in context or "₽" in context:
             strengths.append("На сайте найдена информация о ценах.")
         else:
@@ -265,13 +299,21 @@ class AIService:
             })
 
         main_problem = weaknesses[0] if weaknesses else "Явная проблема по текущим данным не найдена."
-        summary = (
-            f"За период зафиксировано {funnel['pageviews']} просмотров страниц, "
-            f"{funnel['viewed_services']} просмотров услуг, {funnel['viewed_pricing']} просмотров цен, "
-            f"{funnel['clicked_cta']} кликов по CTA и {funnel['submitted_form']} отправок формы."
-        )
+        if funnel["pageviews"] == 0:
+            summary = (
+                "За выбранный период нет событий трекера. Это значит, что AI видит структуру сайта, "
+                "но пока не может сделать поведенческий вывод по посетителям."
+            )
+        else:
+            summary = (
+                f"За период зафиксировано {funnel['pageviews']} просмотров страниц, "
+                f"{funnel['viewed_services']} просмотров услуг, {funnel['viewed_pricing']} просмотров цен, "
+                f"{funnel['clicked_cta']} кликов по CTA и {funnel['submitted_form']} отправок формы."
+            )
 
         return {
+            "source": "local_fallback",
+            "model": None,
             "summary": summary,
             "main_problem": main_problem,
             "recommendations": recommendations,
@@ -299,7 +341,7 @@ class AIService:
         truncated_text = text[:3000] if len(text) > 3000 else text
 
         try:
-            response = self.model.generate_content(
+            response = self._generate_content(
                 [
                     CLASSIFICATION_PROMPT,
                     f"Классифицируй этот блок сайта:\n\n{truncated_text}",
@@ -339,7 +381,7 @@ class AIService:
 - Верни conversion_insights с выводами по заявкам и действиям.
 - Не придумывай данные которых нет в переданном контексте.
 """
-            response = self.model.generate_content(
+            response = self._generate_content(
                 [
                     report_prompt,
                     f"Данные для анализа:\n\n{context}",
@@ -352,11 +394,16 @@ class AIService:
                 ),
             )
 
-            return json.loads(response.text)
+            result = json.loads(response.text)
+            result["source"] = "gemini"
+            result["model"] = self.model_name
+            return result
 
         except Exception as e:
             logger.error(f"AI report generation failed: {e}")
             result = self._fallback_generate_report(context)
+            result["source"] = "local_fallback"
+            result["model"] = None
             result["missing_information"].append(f"Gemini report generation failed: {str(e)[:200]}")
             return result
 

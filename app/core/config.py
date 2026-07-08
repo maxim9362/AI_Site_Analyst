@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     SQL_ECHO: bool = False
     APP_BASE_URL: str = "http://localhost:8000"
+    LOCAL_APP_BASE_URL: str = "http://localhost:8001"
     DEMO_SITE_ID: str = ""
 
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@db:5432/ai_site_analyst"
@@ -21,7 +22,8 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
 
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_FALLBACK_MODELS: str = "gemini-2.0-flash,gemini-flash-lite-latest,gemini-2.0-flash-lite,gemini-flash-latest"
 
     ADMIN_DASHBOARD_PASSWORD: str = "change_me"
     ADMIN_SESSION_SECRET: str = "change_me_admin_session_secret"
@@ -159,8 +161,6 @@ class Settings(BaseSettings):
             errors.append("GOOGLE_REDIRECT_URI must use APP_BASE_URL in production")
         if self.google_login_configured and not self.GOOGLE_AUTH_REDIRECT_URI.startswith(self.APP_BASE_URL.rstrip("/")):
             errors.append("GOOGLE_AUTH_REDIRECT_URI must use APP_BASE_URL in production")
-        if not self.smtp_configured:
-            errors.append("SMTP_HOST and SMTP_FROM_EMAIL are required in production for password reset")
         if self.SMTP_PORT < 1 or self.SMTP_PORT > 65535:
             errors.append("SMTP_PORT must be between 1 and 65535")
         if self.REQUIRE_EXTERNAL_INTEGRATIONS:

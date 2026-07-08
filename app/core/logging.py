@@ -16,13 +16,26 @@ def setup_logging() -> None:
     sqlalchemy_level = logging.INFO if settings.SQL_ECHO else logging.WARNING
     logging.getLogger("sqlalchemy.engine").setLevel(sqlalchemy_level)
     logging.getLogger("uvicorn").setLevel(logging.INFO)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn.access").setLevel(logging.INFO)
 
     logger = logging.getLogger("app")
     logger.info(f"Starting {settings.APP_NAME} in {settings.APP_ENV} mode")
 
     # В локальной консоли сразу показываем основные ссылки, чтобы запуск MVP было легко проверить вручную.
-    logger.info(f"Admin clients: {settings.APP_BASE_URL}/admin/clients")
-    logger.info(f"Demo site: {settings.APP_BASE_URL}/demo")
-    logger.info(f"Tracker script: {settings.APP_BASE_URL}/static/tracker/tracker.js")
-    logger.info(f"Health check: {settings.APP_BASE_URL}/health")
+    local_base_url = settings.LOCAL_APP_BASE_URL.rstrip("/")
+    public_base_url = settings.APP_BASE_URL.rstrip("/")
+
+    logger.info(f"Open locally: {local_base_url}/")
+    logger.info(f"Local login: {local_base_url}/login")
+    logger.info(f"Local register: {local_base_url}/register")
+    logger.info(f"Local admin: {local_base_url}/admin/clients")
+    if public_base_url != local_base_url:
+        logger.info(f"Public base URL for server deploy: {public_base_url}")
+        logger.info(f"Public free site check: {public_base_url}/")
+        logger.info(f"Public login: {public_base_url}/login")
+        logger.info(f"Public register: {public_base_url}/register")
+    logger.info(f"Admin clients: {public_base_url}/admin/clients")
+    if settings.ENABLE_DEMO_ENDPOINTS:
+        logger.info(f"Demo site: {public_base_url}/demo")
+    logger.info(f"Tracker script: {public_base_url}/static/tracker/tracker.js")
+    logger.info(f"Health check: {public_base_url}/health")

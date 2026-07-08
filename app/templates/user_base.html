@@ -4,27 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}AI Site Analyst{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check2">
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">
-            <a href="/sites">AI Site Analyst</a>
+            <a href="/sites" aria-label="AI Site Analyst">
+                <span class="brand-mark">AI</span>
+                <span class="brand-full">AI Site Analyst</span>
+                <span class="brand-short">AI Analyst</span>
+            </a>
         </div>
         <div class="nav-links">
             <a href="/sites">Все сайты</a>
+            <a href="/">Бесплатная проверка</a>
             <a href="/sites/new">Привязать сайт</a>
             <a href="/account/password">Пароль</a>
             <a href="/logout">Выйти</a>
         </div>
     </nav>
-    <main class="container">
+    <main class="container app-shell">
         {% if error %}
         <div class="alert alert-error">{{ error }}</div>
         {% endif %}
         {% block content %}{% endblock %}
     </main>
     <script src="/static/js/ui.js"></script>
-    <script src="/static/js/charts.js?v=5"></script>
+    <script src="/static/js/charts.js?v=6"></script>
 </body>
 </html>

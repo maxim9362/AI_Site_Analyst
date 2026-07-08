@@ -3,23 +3,24 @@
 {% block title %}Код подключения - AI Site Analyst{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header form-page-header">
     <div>
+        <span class="eyebrow">Трекер</span>
         <h1>Код подключения</h1>
         <p>{{ site.name }} - {{ site.domain }}</p>
     </div>
     <a class="btn btn-secondary" href="/sites">Все сайты</a>
 </div>
 
-<div class="tracker-card">
-    <div>
-        <span class="section-kicker">Site ID</span>
+<div class="tracker-card install-card">
+    <div class="site-id-box">
+        <span>Site ID</span>
         <code>{{ site.site_id }}</code>
     </div>
     <div class="form-group">
         <label for="install_code">JS-код</label>
         <textarea id="install_code" rows="4" readonly>{{ install_code }}</textarea>
+        <p class="helper-text">Добавьте этот код перед закрывающим тегом body на сайте.</p>
     </div>
-    <p>Добавьте этот код перед закрывающим тегом body на сайте.</p>
 </div>
 {% endblock %}

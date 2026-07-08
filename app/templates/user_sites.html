@@ -3,16 +3,17 @@
 {% block title %}Все сайты - AI Site Analyst{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header sites-page-header">
     <div>
+        <span class="eyebrow">Рабочее пространство</span>
         <h1>Все сайты</h1>
-        <p>Сайты, подключенные к вашему аккаунту.</p>
+        <p>Подключенные сайты, статусы и быстрый переход к аналитике.</p>
     </div>
     <a class="btn btn-primary" href="/sites/new">Привязать сайт</a>
 </div>
 
 {% if sites %}
-<div class="table-container">
+<div class="table-container sites-table">
     <table>
         <thead>
             <tr>
@@ -24,11 +25,12 @@
             </tr>
         </thead>
         <tbody>
-            {% for site in sites %}
+            {% for row in sites %}
+            {% set site = row.site %}
             <tr>
                 <td><a class="back-link" href="/sites/{{ site.site_id }}">{{ site.name }}</a></td>
-                <td>{{ site.domain }}</td>
-                <td><code>{{ site.site_id }}</code></td>
+                <td class="text-break">{{ site.domain }}</td>
+                <td><code class="site-id-code">{{ site.site_id }}</code></td>
                 <td>
                     {% if site.is_active %}
                     <span class="status status-active">Активен</span>
@@ -37,18 +39,50 @@
                     {% endif %}
                 </td>
                 <td>
-                    <a class="btn btn-small" href="/sites/{{ site.site_id }}">Открыть</a>
-                    <a class="btn btn-small" href="/demo?site_id={{ site.site_id }}" target="_blank" rel="noopener">Демо</a>
-                    <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код</a>
+                    <div class="table-actions">
+                        <a class="btn btn-small" href="/sites/{{ site.site_id }}">Dashboard</a>
+                        <a class="btn btn-small" href="{{ row.public_url }}" target="_blank" rel="noopener">Сайт</a>
+                        <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код</a>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
+
+<div class="mobile-site-list">
+    {% for row in sites %}
+    {% set site = row.site %}
+    <article class="site-mobile-card">
+        <div class="site-mobile-card-head">
+            <div>
+                <h2>{{ site.name }}</h2>
+                <p>{{ site.domain }}</p>
+            </div>
+            {% if site.is_active %}
+            <span class="status status-active">Активен</span>
+            {% else %}
+            <span class="status status-inactive">Отключен</span>
+            {% endif %}
+        </div>
+        <div class="site-id-box">
+            <span>Site ID</span>
+            <code>{{ site.site_id }}</code>
+        </div>
+        <div class="site-mobile-actions">
+            <a class="btn btn-primary" href="/sites/{{ site.site_id }}">Открыть dashboard</a>
+            <a class="btn btn-secondary" href="{{ row.public_url }}" target="_blank" rel="noopener">Сайт</a>
+            <a class="btn btn-secondary" href="/sites/{{ site.site_id }}/install">Код</a>
+        </div>
+    </article>
+    {% endfor %}
+</div>
 {% else %}
 <div class="empty-state">
-    <p>Пока нет подключенных сайтов.</p>
+    <span class="eyebrow">Начало работы</span>
+    <h2>Пока нет подключенных сайтов</h2>
+    <p>Добавьте первый сайт, чтобы получить код трекера и начать сбор аналитики.</p>
     <a class="btn btn-primary" href="/sites/new">Привязать первый сайт</a>
 </div>
 {% endif %}

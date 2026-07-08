@@ -1,7 +1,9 @@
 document.addEventListener('DOMContentLoaded', function() {
+    restorePageScrollPosition();
     restoreGscScrollPosition();
     initMetricCharts();
     initGscPeriodNavigation();
+    initPeriodScrollPersistence();
 });
 
 function initMetricCharts(root) {
@@ -93,6 +95,45 @@ function navigateToGscPeriod(url) {
         // sessionStorage can be unavailable in some embedded browsers.
     }
     window.location.href = url.split('#')[0];
+}
+
+function initPeriodScrollPersistence(root) {
+    root = root || document;
+    var links = root.querySelectorAll('.period-switcher a[href]');
+    links.forEach(function(link) {
+        if (link.dataset.periodScrollInitialized === 'true') return;
+        link.dataset.periodScrollInitialized = 'true';
+        link.addEventListener('click', function(event) {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            try {
+                sessionStorage.setItem('pageScrollY', String(window.scrollY));
+            } catch (error) {
+                // sessionStorage can be unavailable in some embedded browsers.
+            }
+        });
+    });
+}
+
+function restorePageScrollPosition() {
+    var savedScrollY = null;
+    try {
+        savedScrollY = sessionStorage.getItem('pageScrollY');
+        sessionStorage.removeItem('pageScrollY');
+    } catch (error) {
+        savedScrollY = null;
+    }
+    if (savedScrollY === null) return;
+
+    var targetY = parseInt(savedScrollY, 10);
+    if (Number.isNaN(targetY)) return;
+
+    if ('scrollRestoration' in window.history) {
+        window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(window.scrollX, targetY);
+    window.requestAnimationFrame(function() {
+        window.scrollTo(window.scrollX, targetY);
+    });
 }
 
 function restoreGscScrollPosition() {

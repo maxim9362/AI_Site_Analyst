@@ -9,6 +9,7 @@ from app.core.token_crypto import decode_token
 from app.repositories.gsc_repository import GSCRepository
 from app.repositories.site_repository import SiteRepository
 from app.schemas.gsc import GSCPropertyRead, GSCSummaryRead
+from app.services.url_normalization import normalize_gsc_property_url
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +36,20 @@ class GSCService:
         start = end - timedelta(days=days - 1)
         return normalized, start, end
 
+    async def _ensure_property_url_normalized(self, property_obj) -> str:
+        normalized = normalize_gsc_property_url(property_obj.property_url)
+        if normalized and normalized != property_obj.property_url:
+            property_obj.property_url = normalized
+            await self.session.commit()
+            await self.session.refresh(property_obj)
+        return property_obj.property_url
+
     async def connect_gsc_property(self, public_site_id: str, property_url: str) -> GSCPropertyRead | None:
         site = await self.site_repository.get_site_by_site_id(public_site_id)
         if not site:
             return None
 
+        property_url = normalize_gsc_property_url(property_url)
         property_obj = await self.gsc_repository.create_or_update_property(site.id, site.site_id, property_url)
         return GSCPropertyRead.model_validate(property_obj)
 
@@ -113,6 +123,7 @@ class GSCService:
         if not property_obj.property_url:
             await self.gsc_repository.update_last_error(property_obj, "GSC property URL is missing")
             return {"status": "missing_property_url", "message": "GSC property URL is missing.", "rows": []}
+        property_url = await self._ensure_property_url_normalized(property_obj)
 
         access_token = decode_token(property_obj.access_token)
         refresh_token = decode_token(property_obj.refresh_token)
@@ -139,7 +150,7 @@ class GSCService:
             )
             rows = GSCGoogleClient.query_search_analytics(
                 credentials=credentials,
-                site_url=property_obj.property_url,
+                site_url=property_url,
                 start_date=start.isoformat(),
                 end_date=yesterday.isoformat(),
                 dimensions=dimensions,
@@ -147,7 +158,7 @@ class GSCService:
             )
             return {
                 "status": "ok",
-                "site_url": property_obj.property_url,
+                "site_url": property_url,
                 "period": period,
                 "start_date": start.isoformat(),
                 "end_date": yesterday.isoformat(),
@@ -240,6 +251,7 @@ class GSCService:
                 "site_id": public_site_id,
                 "rows_saved": 0,
             }
+        property_url = await self._ensure_property_url_normalized(property_obj)
 
         access_token = decode_token(property_obj.access_token)
         refresh_token = decode_token(property_obj.refresh_token)
@@ -271,7 +283,7 @@ class GSCService:
             )
             rows = GSCGoogleClient.query_search_analytics(
                 credentials=credentials,
-                site_url=property_obj.property_url,
+                site_url=property_url,
                 start_date=start.isoformat(),
                 end_date=yesterday.isoformat(),
                 dimensions=["date", "query", "page"],
@@ -324,7 +336,7 @@ class GSCService:
             "status": "ok",
             "message": "Google Search Console data synced successfully.",
             "site_id": public_site_id,
-            "property_url": property_obj.property_url,
+            "property_url": property_url,
             "period": period,
             "start_date": start.isoformat(),
             "end_date": yesterday.isoformat(),

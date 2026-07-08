@@ -3,18 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход — AI Site Analyst</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>Вход - AI Site Analyst</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check3">
 </head>
-<body>
-    <nav class="navbar">
-        <div class="nav-brand"><a href="/">AI Site Analyst</a></div>
-        <div class="nav-links"><a href="/register">Регистрация</a></div>
+<body class="auth-body">
+    <nav class="navbar auth-navbar">
+        <div class="nav-brand">
+            <a href="/" aria-label="AI Site Analyst">
+                <span class="brand-mark">AI</span>
+                <span class="brand-full">AI Site Analyst</span>
+                <span class="brand-short">AI Analyst</span>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="/">Проверить сайт бесплатно</a>
+            <a href="/register">Регистрация</a>
+        </div>
     </nav>
-    <main class="container">
-        <div class="login-card">
+    <main class="auth-shell">
+        <section class="login-card auth-card">
+            <span class="eyebrow">Личный кабинет</span>
             <h1>Вход</h1>
-            <p>Войдите в аккаунт, чтобы управлять сайтами.</p>
+            <p>Войдите в аккаунт, чтобы управлять сайтами и смотреть аналитику.</p>
+            <div class="auth-free-check-card">
+                <strong>Хотите сначала проверить сайт?</strong>
+                <span>Бесплатный предварительный анализ работает без регистрации.</span>
+                <a href="/">Открыть проверку сайта</a>
+            </div>
             {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
             {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
             {% if google_login_enabled %}
@@ -33,10 +49,11 @@
                 <button type="submit" class="btn btn-primary">Войти</button>
             </form>
             <div class="auth-links">
+                <a href="/">Проверить сайт бесплатно</a>
                 <a href="/forgot-password">Забыли пароль?</a>
                 <a href="/register">Создать аккаунт</a>
             </div>
-        </div>
+        </section>
     </main>
 </body>
 </html>

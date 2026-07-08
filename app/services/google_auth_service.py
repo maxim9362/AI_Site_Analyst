@@ -59,6 +59,7 @@ class GoogleAuthService:
                 }
             },
             scopes=[scope.strip() for scope in settings.GOOGLE_AUTH_SCOPES.split(",") if scope.strip()],
+            autogenerate_code_verifier=False,
         )
         flow.redirect_uri = settings.GOOGLE_AUTH_REDIRECT_URI
         authorization_url, _ = flow.authorization_url(
@@ -89,6 +90,7 @@ class GoogleAuthService:
                     }
                 },
                 scopes=[scope.strip() for scope in settings.GOOGLE_AUTH_SCOPES.split(",") if scope.strip()],
+                autogenerate_code_verifier=False,
             )
             flow.redirect_uri = settings.GOOGLE_AUTH_REDIRECT_URI
             flow.fetch_token(code=code)

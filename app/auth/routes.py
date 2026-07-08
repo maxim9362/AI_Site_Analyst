@@ -1,3 +1,4 @@
+import logging
 import time
 from datetime import timezone
 
@@ -18,6 +19,7 @@ from app.services.google_auth_service import GoogleAuthError, GoogleAuthService
 from app.services.gsc_oauth_service import GSCOAuthService
 from app.services.gsc_service import GSCService
 from app.services.site_service import SiteService
+from app.services.url_normalization import normalize_public_url
 from app.services.user_service import (
     CurrentPasswordInvalidError,
     PasswordPolicyError,
@@ -31,6 +33,7 @@ from app.tasks.site_analysis_tasks import run_site_analysis_task
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+logger = logging.getLogger("app.actions")
 
 
 ANALYTICS_DETAIL_CONFIG = {
@@ -79,6 +82,10 @@ def _format_password_errors(error: PasswordPolicyError) -> str:
 
 def _same_password_error() -> str:
     return "Пароли не совпадают."
+
+
+def _site_public_url(domain: str) -> str:
+    return normalize_public_url(domain)
 
 
 async def _get_current_user_id(request: Request, db: AsyncSession):
@@ -287,13 +294,18 @@ def _build_pagespeed_detail(result) -> dict:
 
 
 @router.get("/register")
-async def register_page(request: Request, db: AsyncSession = Depends(get_db)):
+async def register_page(request: Request, site_url: str = "", db: AsyncSession = Depends(get_db)):
     if await _get_current_user_id(request, db):
         return _redirect("/sites")
     return templates.TemplateResponse(
         request,
         "register.html",
-        {"error": None, "email": "", "google_login_enabled": settings.google_login_configured},
+        {
+            "error": None,
+            "email": "",
+            "site_url": site_url,
+            "google_login_enabled": settings.google_login_configured,
+        },
     )
 
 
@@ -306,7 +318,9 @@ async def register_submit(
     db: AsyncSession = Depends(get_db),
 ):
     client_host = request.client.host if request.client else "unknown"
+    logger.info("ACTION register_attempt email=%s ip=%s", email.strip().lower(), client_host)
     if not check_rate_limit(f"user-register:{client_host}", settings.ADMIN_LOGIN_RATE_LIMIT_PER_MINUTE):
+        logger.info("ACTION register_rate_limited email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -319,6 +333,7 @@ async def register_submit(
         )
 
     if password != confirm_password:
+        logger.info("ACTION register_failed reason=password_mismatch email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -333,6 +348,7 @@ async def register_submit(
     try:
         user_data = UserCreate(email=email, password=password)
     except ValidationError:
+        logger.info("ACTION register_failed reason=validation email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -348,6 +364,7 @@ async def register_submit(
     try:
         user = await service.register_user(user_data)
     except UserAlreadyExistsError:
+        logger.info("ACTION register_failed reason=user_exists email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -359,6 +376,7 @@ async def register_submit(
             status_code=status.HTTP_409_CONFLICT,
         )
     except PasswordPolicyError as exc:
+        logger.info("ACTION register_failed reason=password_policy email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "register.html",
@@ -371,6 +389,7 @@ async def register_submit(
         )
 
     demo_site = await create_demo_site_for_user(db, user.id)
+    logger.info("ACTION register_success user_id=%s email=%s demo_site=%s", user.id, user.email, demo_site.site_id if demo_site else "-")
     response = _redirect(f"/sites/{demo_site.site_id}" if demo_site else "/sites")
     _set_user_cookie(response, user.id)
     return response
@@ -400,7 +419,9 @@ async def login_submit(
     db: AsyncSession = Depends(get_db),
 ):
     client_host = request.client.host if request.client else "unknown"
+    logger.info("ACTION login_attempt email=%s ip=%s", email.strip().lower(), client_host)
     if not check_rate_limit(f"user-login:{client_host}", settings.ADMIN_LOGIN_RATE_LIMIT_PER_MINUTE):
+        logger.info("ACTION login_rate_limited email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -416,6 +437,7 @@ async def login_submit(
     service = UserService(db)
     user = await service.authenticate_user(email, password)
     if not user:
+        logger.info("ACTION login_failed email=%s ip=%s", email.strip().lower(), client_host)
         return templates.TemplateResponse(
             request,
             "login.html",
@@ -428,6 +450,7 @@ async def login_submit(
             status_code=status.HTTP_401_UNAUTHORIZED,
         )
 
+    logger.info("ACTION login_success user_id=%s email=%s ip=%s", user.id, user.email, client_host)
     response = _redirect("/sites")
     _set_user_cookie(response, user.id)
     return response
@@ -680,7 +703,8 @@ async def user_sites(request: Request, db: AsyncSession = Depends(get_db)):
         return _redirect("/login")
 
     sites = await SiteService(db).list_sites_by_user(user_id)
-    return templates.TemplateResponse(request, "user_sites.html", {"sites": sites})
+    site_rows = [{"site": site, "public_url": _site_public_url(site.domain)} for site in sites]
+    return templates.TemplateResponse(request, "user_sites.html", {"sites": site_rows})
 
 
 @router.get("/sites/new")
@@ -778,7 +802,44 @@ async def user_site_dashboard(
     return templates.TemplateResponse(
         request,
         "user_site_dashboard.html",
-        {"dashboard": dashboard, "site": dashboard["site"]},
+        {"dashboard": dashboard, "site": dashboard["site"], "public_url": _site_public_url(dashboard["site"].domain)},
+    )
+
+
+@router.get("/sites/{site_id}/mobile/{section}")
+async def user_site_mobile_section(
+    site_id: str,
+    section: str,
+    request: Request,
+    period: str = "7d",
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    allowed_sections = {"overview", "analytics", "search", "sources", "pagespeed", "ai", "install"}
+    if section not in allowed_sections:
+        return _redirect(f"/sites/{site_id}")
+
+    site_service = SiteService(db)
+    site = await site_service.get_user_site_by_site_id(user_id, site_id)
+    if not site:
+        return _redirect("/sites")
+
+    dashboard = await ProductDashboardService(db).get_site_dashboard(site.site_id, period=period)
+    if not dashboard:
+        return _redirect("/sites")
+
+    return templates.TemplateResponse(
+        request,
+        "user_site_section.html",
+        {
+            "dashboard": dashboard,
+            "site": dashboard["site"],
+            "public_url": _site_public_url(dashboard["site"].domain),
+            "section": section,
+        },
     )
 
 
@@ -910,5 +971,6 @@ async def run_user_site_analysis(
     if not site:
         return _redirect("/sites")
 
+    logger.info("ACTION ai_analysis_run site_id=%s user_id=%s", site.site_id, user_id)
     background_tasks.add_task(run_site_analysis_task, site.site_id, 7)
     return _redirect(f"/sites/{site.site_id}")

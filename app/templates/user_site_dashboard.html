@@ -13,10 +13,35 @@
         <span>Site ID</span>
         <code>{{ site.site_id }}</code>
         <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код подключения</a>
-        <a class="btn btn-small" href="/demo?site_id={{ site.site_id }}" target="_blank" rel="noopener">Открыть демо</a>
+        <a class="btn btn-small" href="{{ public_url }}" target="_blank" rel="noopener">Сайт</a>
     </div>
 </div>
 
+{% set mobile_sections = [
+    {"key": "overview", "label": "Обзор", "hint": "Статус, оценка и запуск анализа"},
+    {"key": "analytics", "label": "Посетители", "hint": "Просмотры, клики, цели и боты"},
+    {"key": "search", "label": "Поиск", "hint": "Google, CTR, позиции и запросы"},
+    {"key": "sources", "label": "Источники", "hint": "Откуда пришли пользователи"},
+    {"key": "pagespeed", "label": "Скорость", "hint": "Mobile, desktop и детали Lighthouse"},
+    {"key": "ai", "label": "AI-отчет", "hint": "Выводы и главная проблема"},
+    {"key": "install", "label": "Код", "hint": "Подключение трекера к сайту"}
+] %}
+
+<section class="mobile-dashboard-home" aria-label="Мобильное меню разделов">
+    <details class="mobile-side-menu" open>
+        <summary>Разделы сайта</summary>
+        <nav class="mobile-section-grid">
+            {% for item in mobile_sections %}
+            <a href="/sites/{{ site.site_id }}/mobile/{{ item.key }}?period={{ dashboard.period }}">
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.hint }}</span>
+            </a>
+            {% endfor %}
+        </nav>
+    </details>
+</section>
+
+<div class="dashboard-full-content">
 <section class="section">
     <div class="period-switcher" aria-label="Период">
         {% for option in dashboard.period_options %}
@@ -441,6 +466,16 @@
         </div>
 
         {% if dashboard.latest_ai_report %}
+        {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
+        <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
+            {% if ai_raw.get('source') == 'gemini' %}
+            <span>Gemini AI работает</span>
+            <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
+            {% else %}
+            <span>Локальный резервный анализ</span>
+            <strong>Проверьте Gemini API или запустите отчет заново</strong>
+            {% endif %}
+        </div>
         <div class="report-section">
             <h3>Что происходит</h3>
             <p>{{ dashboard.latest_ai_report.summary }}</p>
@@ -449,11 +484,28 @@
             <h3>Главная проблема</h3>
             <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
         </div>
+        {% if dashboard.latest_ai_report.recommendations %}
+        <div class="report-section">
+            <h3>Что сделать</h3>
+            <div class="metric-list">
+                {% for rec in dashboard.latest_ai_report.recommendations[:3] %}
+                <div><span>{{ rec.title }}</span><strong>{{ rec.priority }}</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+            <button class="btn btn-primary" type="submit">Перезапустить AI-анализ</button>
+        </form>
         {% else %}
         <div class="empty-state">
             <p>AI-отчет появится после сбора данных и запуска анализа.</p>
         </div>
+        <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+            <button class="btn btn-primary" type="submit">Запустить AI-анализ</button>
+        </form>
         {% endif %}
     </div>
 </section>
+</div>
 {% endblock %}
