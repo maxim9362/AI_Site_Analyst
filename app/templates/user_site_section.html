@@ -1,0 +1,335 @@
+{% extends "user_base.html" %}
+
+{% set section_titles = {
+    "overview": "Обзор сайта",
+    "analytics": "Посетители",
+    "search": "Поиск",
+    "sources": "Источники",
+    "pagespeed": "Скорость",
+    "ai": "AI-отчет",
+    "install": "Код подключения"
+} %}
+
+{% block title %}{{ section_titles.get(section, "Раздел") }} - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="mobile-section-page">
+    <div class="mobile-section-top">
+        <a href="/sites/{{ site.site_id }}" class="back-link">Разделы</a>
+        <div>
+            <span class="section-kicker">{{ site.name }}</span>
+            <h1>{{ section_titles.get(section, "Раздел") }}</h1>
+            <p>{{ site.domain }}</p>
+        </div>
+    </div>
+
+    {% if section != "install" %}
+    <section class="section mobile-period-section">
+        <div class="period-switcher" aria-label="Период">
+            {% for option in dashboard.period_options %}
+            <a href="/sites/{{ site.site_id }}/mobile/{{ section }}?period={{ option.value }}" class="{{ 'is-active' if option.value == dashboard.period else '' }}">
+                {{ option.label }}
+            </a>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if section == "overview" %}
+    <section class="section">
+        {% if dashboard.site_score and not dashboard.site_score.error %}
+        <div class="score-card">
+            <div class="score-main">
+                <div class="score-number">{{ dashboard.site_score.overall_score if dashboard.site_score.overall_score is not none else "-" }}<span class="score-total">/100</span></div>
+                <div class="score-info">
+                    <span class="score-label-text">{{ dashboard.site_score.label }}</span>
+                    <p>{{ dashboard.site_score.message }}</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if dashboard.site_status %}
+        <div class="status-card status-{{ dashboard.site_status.status }}">
+            <div class="status-card-main">
+                <span class="section-kicker">Статус сайта</span>
+                <strong>{{ dashboard.site_status.status_label }}</strong>
+                <p>{{ dashboard.site_status.message }}</p>
+                <p class="status-eta">Ожидаемое время: {{ dashboard.site_status.eta_label }}</p>
+            </div>
+            <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Запустить анализ</button>
+            </form>
+        </div>
+        {% endif %}
+
+        <div class="ai-report-card mobile-overview-ai">
+            <div class="section-heading">
+                <span class="section-kicker">AI-аналитика</span>
+                <div class="section-title-row">
+                    <h2>Что говорит AI</h2>
+                    <details class="info-popover">
+                        <summary aria-label="Информация">i</summary>
+                        <div>AI-вывод строится на данных трекера, Search Console, PageSpeed и снимках страниц.</div>
+                    </details>
+                </div>
+            </div>
+
+            {% if dashboard.latest_ai_report %}
+            {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
+            <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
+                {% if ai_raw.get('source') == 'gemini' %}
+                <span>Gemini AI работает</span>
+                <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
+                {% else %}
+                <span>Локальный резервный анализ</span>
+                <strong>Проверьте Gemini API или запустите отчет заново</strong>
+                {% endif %}
+            </div>
+            <div class="report-section">
+                <h3>Что происходит</h3>
+                <p>{{ dashboard.latest_ai_report.summary }}</p>
+            </div>
+            <div class="report-section">
+                <h3>Главная проблема</h3>
+                <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
+            </div>
+            {% if dashboard.latest_ai_report.recommendations %}
+            <div class="report-section">
+                <h3>Что сделать</h3>
+                <div class="metric-list">
+                    {% for rec in dashboard.latest_ai_report.recommendations[:3] %}
+                    <div><span>{{ rec.title }}</span><strong>{{ rec.priority }}</strong></div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <a class="btn btn-small" href="/sites/{{ site.site_id }}/mobile/ai?period={{ dashboard.period }}">Открыть полный AI-отчет</a>
+            <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Перезапустить AI-анализ</button>
+            </form>
+            {% else %}
+            <div class="empty-state">
+                <p>AI-отчет появится после сбора данных и запуска анализа.</p>
+            </div>
+            <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Запустить AI-анализ</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if section == "analytics" and dashboard.tracker_analytics %}
+    <section class="section">
+        <div class="product-metrics mobile-compact-metrics">
+            <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/visitors?period={{ dashboard.period }}">
+                <span class="metric-label">Посетители</span>
+                <strong class="metric-number">{{ dashboard.tracker_analytics.visitors.unique_visitors }}</strong>
+                <p>Сессий: {{ dashboard.tracker_analytics.visitors.unique_sessions }}</p>
+            </a>
+            <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/pageviews?period={{ dashboard.period }}">
+                <span class="metric-label">Просмотры</span>
+                <strong class="metric-number">{{ dashboard.tracker_analytics.pageviews.total }}</strong>
+                <p>Всего страниц</p>
+            </a>
+            <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/clicks?period={{ dashboard.period }}">
+                <span class="metric-label">Клики</span>
+                <strong class="metric-number">{{ dashboard.tracker_analytics.clicks.total }}</strong>
+                <p>Кнопки и ссылки</p>
+            </a>
+            <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/goals?period={{ dashboard.period }}">
+                <span class="metric-label">Цели</span>
+                <strong class="metric-number">{{ dashboard.tracker_analytics.goals.total }}</strong>
+                <p>CTA, формы, контакты</p>
+            </a>
+            <a class="metric-card metric-card-link" href="/sites/{{ site.site_id }}/analytics/bots?period={{ dashboard.period }}">
+                <span class="metric-label">Боты</span>
+                <strong class="metric-number">{{ dashboard.tracker_analytics.bots.unique_bots }}</strong>
+                <p>Событий: {{ dashboard.tracker_analytics.bots.total_events }}</p>
+            </a>
+        </div>
+
+        {% if dashboard.tracker_analytics.bots.known_bots %}
+        <div class="metric-card">
+            <span class="metric-label">Информация о ботах</span>
+            <div class="metric-list">
+                {% for bot in dashboard.tracker_analytics.bots.known_bots %}
+                <div><span>{{ bot.name }} · {{ bot.category }}</span><strong>{{ bot.events }}</strong></div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if section == "search" %}
+    <section class="section">
+        {% if dashboard.tracker_analytics and dashboard.tracker_analytics.realtime_search %}
+        <div class="realtime-search-card">
+            <div class="realtime-updated">{{ dashboard.tracker_analytics.realtime_search.updated_label }}</div>
+            <div class="search-console-metrics">
+                {% for item in dashboard.tracker_analytics.realtime_search.summary %}
+                <div class="search-console-metric {{ 'is-disabled' if item.disabled }}" style="--metric-color: {{ item.color }}">
+                    <div class="search-console-metric-title">
+                        <span>{{ item.label }}</span>
+                        <details class="info-popover metric-info-popover">
+                            <summary aria-label="Информация">i</summary>
+                            <div>{{ item.info }}</div>
+                        </details>
+                    </div>
+                    <strong>{{ item.value }}</strong>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="chart-shell realtime-chart-shell">
+                <canvas id="realtimeSearchChart" data-chart='{{ dashboard.tracker_analytics.realtime_search | tojson }}' width="1200" height="420"></canvas>
+                <div id="realtimeSearchChartEmpty" class="chart-empty" style="display:none;">Пока недостаточно данных для графика.</div>
+            </div>
+
+            <div class="realtime-tabs mobile-tabs-flat">
+                {% for tab in dashboard.tracker_analytics.realtime_search.tabs %}
+                <div class="mobile-data-list">
+                    <h3>{{ tab.label }}</h3>
+                    {% if tab.rows %}
+                        {% for row in tab.rows[:8] %}
+                        <div class="mobile-data-row">
+                            <span>{{ row.primary }}</span>
+                            <strong>{{ row.clicks }} / {{ row.impressions }}</strong>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                    <p>{{ tab.empty }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Поисковые данные появятся после сбора событий и подключения Google Search Console.</p></div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if section == "sources" %}
+    <section class="section">
+        {% if dashboard.traffic_sources and dashboard.traffic_sources['items'] %}
+        <div class="mobile-data-list">
+            {% for source in dashboard.traffic_sources['items'] %}
+            <div class="mobile-data-row">
+                <span>{{ source.source | capitalize }} · {{ source.channel }}</span>
+                <strong>{{ source.visits }} / {{ source.percent }}%</strong>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>Источники появятся после первых визитов с установленным трекером.</p></div>
+        {% endif %}
+
+        {% if dashboard.utm_campaigns['items'] %}
+        <div class="mobile-data-list">
+            <h3>UTM кампании</h3>
+            {% for campaign in dashboard.utm_campaigns['items'] %}
+            <div class="mobile-data-row">
+                <span>{{ campaign.source or "-" }} / {{ campaign.medium or "-" }}</span>
+                <strong>{{ campaign.visits }}</strong>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if section == "pagespeed" %}
+    <section class="section">
+        <div class="action-buttons">
+            <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
+                <input type="hidden" name="strategy" value="mobile">
+                <button type="submit" class="btn btn-secondary">Проверить mobile</button>
+            </form>
+            <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
+                <input type="hidden" name="strategy" value="desktop">
+                <button type="submit" class="btn btn-secondary">Проверить desktop</button>
+            </form>
+        </div>
+
+        {% if dashboard.pagespeed %}
+        <div class="product-metrics mobile-compact-metrics">
+            {% for strategy, result in dashboard.pagespeed.items() %}
+            <div class="metric-card">
+                <span class="metric-label">{{ strategy }}</span>
+                <strong class="metric-number">{{ "-" if result.error else "%.0f"|format(result.performance_score or 0) }}</strong>
+                <p>{{ result.error if result.error else "Performance" }}</p>
+                <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state"><p>PageSpeed еще не запускался для этого сайта.</p></div>
+        {% endif %}
+    </section>
+    {% endif %}
+
+    {% if section == "ai" %}
+    <section class="section">
+        <div class="ai-report-card">
+            {% if dashboard.latest_ai_report %}
+            {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
+            <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
+                {% if ai_raw.get('source') == 'gemini' %}
+                <span>Gemini AI работает</span>
+                <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
+                {% else %}
+                <span>Локальный резервный анализ</span>
+                <strong>Проверьте Gemini API или запустите отчет заново</strong>
+                {% endif %}
+            </div>
+            <div class="report-section">
+                <h3>Что происходит</h3>
+                <p>{{ dashboard.latest_ai_report.summary }}</p>
+            </div>
+            <div class="report-section">
+                <h3>Главная проблема</h3>
+                <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
+            </div>
+            {% if dashboard.latest_ai_report.recommendations %}
+            <div class="report-section">
+                <h3>Что сделать</h3>
+                <div class="metric-list">
+                    {% for rec in dashboard.latest_ai_report.recommendations %}
+                    <div><span>{{ rec.title }}</span><strong>{{ rec.priority }}</strong></div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Перезапустить AI-анализ</button>
+            </form>
+            {% else %}
+            <div class="empty-state"><p>AI-отчет появится после сбора данных и запуска анализа.</p></div>
+            <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Запустить AI-анализ</button>
+            </form>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if section == "install" %}
+    <section class="section">
+        <div class="integration-panel">
+            <div>
+                <span class="section-kicker">Подключение</span>
+                <h2>Код трекера</h2>
+                <p>Установите код на сайт, который обслуживается этой панелью.</p>
+            </div>
+            <div class="integration-panel-actions">
+                <a class="btn btn-primary" href="/sites/{{ site.site_id }}/install">Открыть код</a>
+                <a class="btn btn-secondary" href="{{ public_url }}" target="_blank" rel="noopener">Открыть сайт</a>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

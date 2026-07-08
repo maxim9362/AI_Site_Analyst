@@ -1,0 +1,12 @@
+.env
+.env.backup*
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.idea/
+.vscode/
+.DS_Store
+postgres_data/
+*.log
