@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header form-page-header">
     <div>
-        <span class="eyebrow">Трекер</span>
+        <span class="eyebrow">Подключение сайта</span>
         <h1>Код подключения</h1>
         <p>{{ site.name }} - {{ site.domain }}</p>
     </div>
@@ -14,13 +14,14 @@
 
 <div class="tracker-card install-card">
     <div class="site-id-box">
-        <span>Site ID</span>
+        <span>Технический ID</span>
         <code>{{ site.site_id }}</code>
     </div>
     <div class="form-group">
         <label for="install_code">JS-код</label>
         <textarea id="install_code" rows="4" readonly>{{ install_code }}</textarea>
-        <p class="helper-text">Добавьте этот код перед закрывающим тегом body на сайте.</p>
+        <p class="helper-text">Добавьте этот код перед закрывающим тегом &lt;/body&gt; на сайте. После установки сервис начнёт собирать посещения, клики и действия пользователей.</p>
+        <button class="btn btn-primary" type="button" data-copy-target="install_code">Скопировать код</button>
     </div>
 </div>
 {% endblock %}

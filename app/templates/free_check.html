@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Бесплатная проверка сайта - AI Site Analyst</title>
     <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
-    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check3">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260711-smart-check1">
 </head>
 <body class="free-check-body">
     <nav class="navbar auth-navbar free-check-nav">
@@ -17,39 +17,57 @@
             </a>
         </div>
         <div class="nav-links">
+            <a href="/demo">Посмотреть демо</a>
             <a href="/login">Личный кабинет</a>
             <a class="nav-cta-link" href="/register">Создать аккаунт</a>
         </div>
     </nav>
+    <div class="mobile-floating-nav" data-mobile-menu>
+        <button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню" aria-controls="mobileFloatingMenu" aria-expanded="false">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <nav class="mobile-menu-panel" id="mobileFloatingMenu" data-mobile-menu-panel aria-label="Мобильное меню">
+            <a class="mobile-menu-primary" href="/free-check">Бесплатная проверка</a>
+            <a href="/demo">Демо</a>
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        </nav>
+    </div>
 
     <main class="free-check-shell">
         <section class="free-check-hero">
             <div class="free-check-hero-copy">
                 <span class="section-kicker">Бесплатный предварительный анализ</span>
-                <h1>Проверьте сайт за минуту</h1>
-                <p>Получите быстрый AI-анализ структуры, SEO, скорости восприятия и понятности сайта без регистрации.</p>
+                <h1>Проверьте сайт бесплатно и узнайте, что мешает заявкам</h1>
+                <p>Сервис быстро проверит скорость, SEO, мобильную версию, понятность страницы и технические ошибки.</p>
                 <form class="free-check-form" id="freeCheckForm">
-                    <label for="siteUrl">Адрес сайта</label>
+                    <label for="siteUrl">Введите адрес сайта</label>
                     <div class="free-check-input-row">
                         <input type="url" id="siteUrl" name="url" placeholder="https://example.com" autocomplete="url" required>
-                        <button class="btn btn-primary" type="submit">Проверить сайт</button>
+                        <button class="btn btn-primary" type="submit" id="freeCheckSubmit">Проверить сайт бесплатно</button>
                     </div>
                 </form>
-                <p class="free-check-note">Мы проверяем только открытую страницу. Реальные клики, заявки и источники появятся после установки JS-кода.</p>
+                <div class="free-check-points" aria-label="Преимущества бесплатной проверки">
+                    <span>Без регистрации</span>
+                    <span>Проверка за минуту</span>
+                    <span>Простые рекомендации</span>
+                    <span>Полный анализ после JS-кода</span>
+                </div>
+                <p class="free-check-note">Мы проверяем открытую страницу. Для точного анализа поведения посетителей нужно подключить JS-код.</p>
             </div>
             <div class="free-check-preview" aria-hidden="true">
                 <div class="preview-score">AI</div>
                 <div>
-                    <strong>Структура</strong>
-                    <span>SEO, CTA, формы, контакты</span>
+                    <strong>Мини-отчёт</strong>
+                    <span>Скорость, SEO, мобильная версия, заявки</span>
                 </div>
             </div>
         </section>
 
         <section class="free-check-loading" id="freeCheckLoading" hidden>
-            <div class="loader-line"></div>
-            <h2>Проверяем структуру, SEO и понятность сайта...</h2>
-            <p>Обычно это занимает до минуты.</p>
+            <div class="free-check-spinner" aria-hidden="true"></div>
+            <h2>Проверяем структуру, SEO, скорость и понятность сайта...</h2>
+            <p>Анализируем открытую страницу. Это может занять несколько секунд.</p>
         </section>
 
         <section class="free-check-error" id="freeCheckError" hidden></section>
@@ -62,8 +80,8 @@
                     <small>/100</small>
                 </div>
                 <div>
-                    <span class="section-kicker">Короткий вывод</span>
-                    <h2>Что видно по открытой странице</h2>
+                    <span class="section-kicker">Краткий вывод</span>
+                    <h2>На основе открытой страницы видно</h2>
                     <p id="freeCheckSummary"></p>
                 </div>
             </div>
@@ -74,7 +92,11 @@
                     <ul id="freeCheckFindings"></ul>
                 </div>
                 <div class="free-check-card">
-                    <h3>Что улучшить первым</h3>
+                    <h3>Что уже хорошо</h3>
+                    <ul id="freeCheckStrengths"></ul>
+                </div>
+                <div class="free-check-card">
+                    <h3>Быстрые улучшения</h3>
                     <ul id="freeCheckWins"></ul>
                 </div>
             </div>
@@ -83,7 +105,7 @@
                 <div>
                     <span class="section-kicker">Полный анализ</span>
                     <h2>Что даст подключение AI Site Analyst</h2>
-                    <p>Предварительная проверка не видит реальные действия посетителей. После регистрации и установки JS-кода вы увидите поведение людей на сайте.</p>
+                    <p>Хотите полный анализ с реальными посетителями, кликами и заявками? Зарегистрируйтесь и подключите JS-код.</p>
                 </div>
                 <div class="free-check-benefits">
                     <span>Реальные посетители</span>
@@ -95,13 +117,15 @@
                 </div>
                 <div class="free-check-cta">
                     <a class="btn btn-primary" id="freeCheckRegister" href="/register">Зарегистрироваться и подключить сайт</a>
+                    <a class="btn btn-secondary" href="/demo">Посмотреть пример dashboard</a>
                     <a class="btn btn-secondary" href="/login">Войти в кабинет</a>
                 </div>
-                <p class="free-check-limit">Это предварительный анализ по открытой странице сайта. Чтобы получить полный отчет по кликам, источникам трафика, заявкам и поведению пользователей, нужно зарегистрироваться и установить JS-код AI Site Analyst.</p>
+                <p class="free-check-limit">Это предварительный анализ по открытым данным сайта. Он не видит реальные действия посетителей. Чтобы получить полный отчёт по кликам, источникам трафика, заявкам и поведению пользователей, нужно зарегистрироваться и установить JS-код AI Site Analyst.</p>
             </div>
         </section>
     </main>
 
-    <script src="/static/js/free-check.js?v=20260708-free-check1"></script>
+    <script src="/static/js/ui.js?v=20260711-stage12"></script>
+    <script src="/static/js/free-check.js?v=20260711-smart-check1"></script>
 </body>
 </html>

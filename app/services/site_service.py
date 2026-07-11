@@ -9,6 +9,15 @@ from app.repositories.site_repository import SiteRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.client import ClientCreate
 from app.schemas.site import SiteCreate, SiteRead, UserSiteCreate
+from app.services.plan_limits import get_plan_limits, site_limit_message
+
+
+class AccountSiteLimitError(ValueError):
+    pass
+
+
+class ClientAccessError(ValueError):
+    pass
 
 
 class SiteService:
@@ -31,9 +40,19 @@ class SiteService:
         if not user:
             raise ValueError("User not found")
 
-        client = await self.client_repository.get_client_by_email(user.email)
-        if not client:
-            client = await self.client_repository.create_client(ClientCreate(name=user.email, email=user.email))
+        account_limits = get_plan_limits(user.account_plan)
+        current_site_count = await self.repository.count_sites_by_user(user_id)
+        if current_site_count >= account_limits.max_sites:
+            raise AccountSiteLimitError(site_limit_message(account_limits))
+
+        if data.client_id:
+            client = await self.client_repository.get_user_client(user_id, data.client_id)
+            if not client:
+                raise ClientAccessError("Client is not available")
+        else:
+            client = await self.client_repository.get_client_by_email(user.email)
+            if not client:
+                client = await self.client_repository.create_client(ClientCreate(name=user.email, email=user.email))
 
         site_id = self._generate_site_id()
         site_data = SiteCreate(

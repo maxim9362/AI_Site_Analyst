@@ -1,27 +1,240 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Site Analyst — понятная аналитика сайта</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('aiSiteTheme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260711-stage12">
+</head>
+<body class="landing-body">
+    <nav class="navbar landing-navbar">
+        <div class="nav-brand">
+            <a href="/" aria-label="AI Site Analyst">
+                <span class="brand-mark">AI</span>
+                <span class="brand-full">AI Site Analyst</span>
+                <span class="brand-short">AI Analyst</span>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="/free-check">Проверить сайт</a>
+            <a href="/demo">Демо</a>
+            <a href="/contact">Контакты</a>
+            <a href="/login">Войти</a>
+            <a class="nav-cta-link" href="/register">Регистрация</a>
+        </div>
+    </nav>
 
-{% block content %}
-<div class="hero">
-    <h1>AI Site Analyst</h1>
-    <p class="subtitle">Service is running</p>
-    <div class="quick-links">
-        <a href="/admin/clients" class="btn btn-primary">View Clients</a>
-        <a href="/health" class="btn btn-secondary">Health Check</a>
+    <div class="mobile-floating-nav" data-mobile-menu>
+        <button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню" aria-controls="mobileFloatingMenu" aria-expanded="false">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <nav class="mobile-menu-panel" id="mobileFloatingMenu" data-mobile-menu-panel aria-label="Мобильное меню">
+            <a class="mobile-menu-primary" href="/free-check">Проверить сайт</a>
+            <a href="/demo">Демо</a>
+            <a href="/contact">Контакты</a>
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        </nav>
     </div>
-</div>
 
-<div class="stats-grid">
-    <div class="stat-card">
-        <h3>API</h3>
-        <p>REST API available at /api</p>
-    </div>
-    <div class="stat-card">
-        <h3>Tracker</h3>
-        <p>JavaScript tracker at /static/tracker/tracker.js</p>
-    </div>
-    <div class="stat-card">
-        <h3>Admin</h3>
-        <p>Admin panel at /admin/clients</p>
-    </div>
-</div>
-{% endblock %}
+    <main class="landing-shell">
+        <section class="landing-hero">
+            <div class="landing-hero-copy">
+                <span class="eyebrow">AI-кабинет аналитики сайта</span>
+                <h1>AI Site Analyst показывает, что мешает сайту получать заявки</h1>
+                <p>
+                    Сервис собирает SEO, скорость, источники трафика, клики, Search Console и AI-рекомендации
+                    в одном понятном кабинете.
+                </p>
+                <div class="landing-actions">
+                    <a class="btn btn-primary" href="/free-check">Проверить сайт бесплатно</a>
+                    <a class="btn btn-secondary" href="/demo">Посмотреть демо</a>
+                    <a class="btn btn-secondary" href="/login">Войти в кабинет</a>
+                </div>
+                <div class="landing-trust-row" aria-label="Что проверяет сервис">
+                    <span>SEO</span>
+                    <span>Скорость</span>
+                    <span>Клики</span>
+                    <span>Заявки</span>
+                    <span>AI-вывод</span>
+                </div>
+            </div>
+            <aside class="landing-preview" aria-label="Пример кабинета">
+                <div class="landing-preview-top">
+                    <span>Оценка сайта</span>
+                    <strong>78<small>/100</small></strong>
+                    <em>Есть точки роста</em>
+                </div>
+                <div class="landing-preview-card">
+                    <span>Главная проблема</span>
+                    <p>Посетители видят услуги, но путь к заявке можно сделать заметнее.</p>
+                </div>
+                <div class="landing-preview-grid">
+                    <div><span>Клики</span><strong>142</strong></div>
+                    <div><span>Заявки</span><strong>18</strong></div>
+                    <div><span>Google</span><strong>2 840</strong></div>
+                    <div><span>Скорость</span><strong>91</strong></div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="landing-section landing-explain">
+            <div class="landing-section-head">
+                <span class="eyebrow">Что делает сервис</span>
+                <h2>Не просто проверяет сайт, а объясняет, что делать дальше</h2>
+            </div>
+            <div class="landing-card-grid three">
+                <article class="landing-card">
+                    <span class="landing-card-number">1</span>
+                    <h3>Проверяет сайт</h3>
+                    <p>SEO, скорость, мобильную версию, структуру страницы и понятность для клиента.</p>
+                </article>
+                <article class="landing-card">
+                    <span class="landing-card-number">2</span>
+                    <h3>Собирает данные в одном месте</h3>
+                    <p>Search Console, источники трафика, клики, страницы и действия посетителей.</p>
+                </article>
+                <article class="landing-card">
+                    <span class="landing-card-number">3</span>
+                    <h3>Объясняет простыми словами</h3>
+                    <p>AI показывает, что работает, что мешает заявкам и что исправить первым.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-section landing-audience">
+            <div class="landing-split-card">
+                <div>
+                    <span class="eyebrow">Кому подходит</span>
+                    <h2>Для владельцев сайтов, SEO и веб-специалистов</h2>
+                    <p>
+                        Сервис помогает не просто запустить сайт, а показать, что с ним происходит после запуска:
+                        какие страницы работают, откуда приходят люди и где теряются заявки.
+                    </p>
+                </div>
+                <div class="landing-pill-list">
+                    <span>Владельцы сайтов</span>
+                    <span>SEO-специалисты</span>
+                    <span>Маркетологи</span>
+                    <span>Веб-дизайнеры</span>
+                    <span>WordPress-разработчики</span>
+                    <span>Небольшие агентства</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="landing-section landing-difference">
+            <div class="landing-section-head">
+                <span class="eyebrow">Чем отличается</span>
+                <h2>Это не просто SEO-аудит</h2>
+                <p>
+                    Обычный аудит показывает ошибки. AI Site Analyst собирает всю картину сайта и объясняет,
+                    что делать дальше простыми словами.
+                </p>
+            </div>
+            <div class="landing-feature-grid">
+                <span>SEO</span>
+                <span>Скорость</span>
+                <span>Мобильная версия</span>
+                <span>Источники трафика</span>
+                <span>Клики</span>
+                <span>Заявки</span>
+                <span>Search Console</span>
+                <span>AI-рекомендации</span>
+            </div>
+        </section>
+
+        <section class="landing-section landing-steps">
+            <div class="landing-section-head">
+                <span class="eyebrow">Как это работает</span>
+                <h2>От быстрой проверки до полноценной аналитики</h2>
+            </div>
+            <div class="landing-step-list">
+                <article>
+                    <strong>01</strong>
+                    <h3>Проверьте сайт бесплатно</h3>
+                    <p>Введите ссылку и получите быстрый предварительный анализ.</p>
+                </article>
+                <article>
+                    <strong>02</strong>
+                    <h3>Зарегистрируйтесь</h3>
+                    <p>Создайте аккаунт и добавьте сайт в личный кабинет.</p>
+                </article>
+                <article>
+                    <strong>03</strong>
+                    <h3>Подключите JS-код</h3>
+                    <p>Добавьте небольшой код на сайт, чтобы сервис видел реальные действия.</p>
+                </article>
+                <article>
+                    <strong>04</strong>
+                    <h3>Получайте аналитику</h3>
+                    <p>Смотрите посещения, клики, заявки, источники трафика и AI-рекомендации.</p>
+                </article>
+            </div>
+        </section>
+
+        <section class="landing-section landing-cabinet">
+            <div class="landing-section-head">
+                <span class="eyebrow">Что будет в кабинете</span>
+                <h2>Всё важное по сайту — на одном экране</h2>
+            </div>
+            <div class="landing-feature-grid cabinet">
+                <span>Оценка сайта</span>
+                <span>SEO и скорость</span>
+                <span>Мобильная версия</span>
+                <span>Источники трафика</span>
+                <span>Клики по WhatsApp, телефону и email</span>
+                <span>Google Search Console</span>
+                <span>AI-рекомендации</span>
+                <span>Код подключения</span>
+            </div>
+        </section>
+
+        <section class="landing-section landing-partners">
+            <div class="landing-split-card">
+                <div>
+                    <span class="eyebrow">Для партнёров</span>
+                    <h2>Дополнительная услуга после создания сайта</h2>
+                    <p>
+                        AI Site Analyst можно использовать как понятный отчет для клиента после запуска сайта:
+                        показать, что происходит, где есть проблемы и почему стоит продолжать SEO, маркетинг и доработки.
+                    </p>
+                    <a class="btn btn-secondary" href="/free-check">Проверить сайт клиента</a>
+                </div>
+                <ul class="landing-check-list">
+                    <li>Показать, какие страницы работают</li>
+                    <li>Объяснить, где теряются заявки</li>
+                    <li>Найти точки роста после запуска</li>
+                    <li>Поддержать дальнейшие доработки фактами</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="landing-cta">
+            <span class="eyebrow">Бесплатная проверка</span>
+            <h2>Проверьте сайт бесплатно</h2>
+            <p>Узнайте за минуту, что мешает сайту получать больше заявок.</p>
+            <div class="landing-actions">
+                <a class="btn btn-primary" href="/free-check">Проверить сайт бесплатно</a>
+                <a class="btn btn-secondary" href="/demo">Посмотреть демо</a>
+                <a class="btn btn-secondary" href="/register">Создать аккаунт</a>
+            </div>
+            <small>Без регистрации. Полный анализ доступен после подключения сайта.</small>
+        </section>
+        <footer class="landing-footer">
+            <a href="/privacy">Конфиденциальность</a>
+            <a href="/terms">Условия</a>
+            <a href="/contact">Контакты</a>
+        </footer>
+    </main>
+
+    <script src="/static/js/ui.js?v=20260711-stage12"></script>
+</body>
+</html>

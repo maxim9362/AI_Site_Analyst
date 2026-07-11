@@ -33,7 +33,7 @@ AI Site Analyst — веб-сервис аналитики сайта и AI-ре
 - снимки страниц и база знаний из текстов сайта;
 - AI-классификация блоков;
 - product dashboard с period switcher (24h / 7d / 30d);
-- Performance overview — единый график tracker + GSC данных;
+- Performance overview — реальный график посещений и просмотров страниц по tracker.js;
 - Google Search Console: OAuth, реальный sync, demo-data;
 - поисковые запросы, CTR, средняя позиция;
 - AI-отчёты с выводами и рекомендациями;
@@ -143,12 +143,15 @@ Dashboard показывает:
 - шапка: название, домен, Site ID, статус
 - tracker.js код для копирования
 - Site Score с разбивкой по категориям
-- Performance overview — график посещений + SEO
+- Performance overview — реальный график посещений и просмотров страниц по данным tracker.js
 - простая аналитика: посетители, просмотры, клики, цели, воронка
 - Google Search Console: показы, клики, CTR, позиция, запросы
 - AI-выводы с insights и quick wins
 
 Technical details (события, снимки, классификации) спрятаны в `<details>` для разработчика. Владелец бизнеса видит только понятные данные.
+
+Performance overview теперь показывает реальный график посещений и просмотров страниц по данным tracker.js.
+SEO-показы, клики, CTR и позиции пока недоступны до подключения Google Search Console.
 
 ## Google Search Console
 

@@ -76,18 +76,8 @@
             </div>
 
             {% if dashboard.latest_ai_report %}
-            {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
-            <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
-                {% if ai_raw.get('source') == 'gemini' %}
-                <span>Gemini AI работает</span>
-                <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
-                {% else %}
-                <span>Локальный резервный анализ</span>
-                <strong>Проверьте Gemini API или запустите отчет заново</strong>
-                {% endif %}
-            </div>
             <div class="report-section">
-                <h3>Что происходит</h3>
+                <h3>Краткий вывод</h3>
                 <p>{{ dashboard.latest_ai_report.summary }}</p>
             </div>
             <div class="report-section">
@@ -246,11 +236,11 @@
         <div class="action-buttons">
             <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
                 <input type="hidden" name="strategy" value="mobile">
-                <button type="submit" class="btn btn-secondary">Проверить mobile</button>
+                <button type="submit" class="btn btn-secondary">Проверить мобильную версию</button>
             </form>
             <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
                 <input type="hidden" name="strategy" value="desktop">
-                <button type="submit" class="btn btn-secondary">Проверить desktop</button>
+                <button type="submit" class="btn btn-secondary">Проверить компьютерную версию</button>
             </form>
         </div>
 
@@ -258,9 +248,9 @@
         <div class="product-metrics mobile-compact-metrics">
             {% for strategy, result in dashboard.pagespeed.items() %}
             <div class="metric-card">
-                <span class="metric-label">{{ strategy }}</span>
+                <span class="metric-label">{{ "Мобильная версия" if strategy == "mobile" else "Компьютерная версия" }}</span>
                 <strong class="metric-number">{{ "-" if result.error else "%.0f"|format(result.performance_score or 0) }}</strong>
-                <p>{{ result.error if result.error else "Performance" }}</p>
+                <p>{{ result.error if result.error else "Скорость открытия страницы" }}</p>
                 <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
             </div>
             {% endfor %}
@@ -275,18 +265,8 @@
     <section class="section">
         <div class="ai-report-card">
             {% if dashboard.latest_ai_report %}
-            {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
-            <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
-                {% if ai_raw.get('source') == 'gemini' %}
-                <span>Gemini AI работает</span>
-                <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
-                {% else %}
-                <span>Локальный резервный анализ</span>
-                <strong>Проверьте Gemini API или запустите отчет заново</strong>
-                {% endif %}
-            </div>
             <div class="report-section">
-                <h3>Что происходит</h3>
+                <h3>Краткий вывод</h3>
                 <p>{{ dashboard.latest_ai_report.summary }}</p>
             </div>
             <div class="report-section">

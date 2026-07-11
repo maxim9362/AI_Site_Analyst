@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Демо-кабинет - AI Site Analyst</title>
+    <script>
+        (function() {
+            var theme = localStorage.getItem('aiSiteTheme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260711-stage12">
+</head>
+<body class="demo-body">
+    <nav class="navbar landing-navbar demo-navbar">
+        <div class="nav-brand">
+            <a href="/" aria-label="AI Site Analyst">
+                <span class="brand-mark">AI</span>
+                <span class="brand-full">AI Site Analyst</span>
+                <span class="brand-short">AI Analyst</span>
+            </a>
+        </div>
+        <div class="nav-links">
+            <a href="/free-check">Проверить сайт</a>
+            <a href="/login">Войти</a>
+            <a href="/contact">Контакты</a>
+            <a class="nav-cta-link" href="/register">Регистрация</a>
+        </div>
+    </nav>
+
+    <div class="mobile-floating-nav" data-mobile-menu>
+        <button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню" aria-controls="mobileFloatingMenu" aria-expanded="false">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <nav class="mobile-menu-panel" id="mobileFloatingMenu" data-mobile-menu-panel aria-label="Мобильное меню">
+            <a class="mobile-menu-primary" href="/free-check">Проверить сайт</a>
+            <a href="/demo">Демо</a>
+            <a href="/contact">Контакты</a>
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        </nav>
+    </div>
+
+    <main class="demo-shell">
+        <section class="demo-hero">
+            <div>
+                <span class="eyebrow">Демо-кабинет</span>
+                <h1>Как выглядит AI Site Analyst после подключения сайта</h1>
+                <p>Пример для сайта “Ремонт кондиционеров в Израиле”. Данные демонстрационные, но структура такая же, как в настоящем кабинете.</p>
+            </div>
+            <div class="demo-notice">
+                Это демонстрационный кабинет с примерными данными. Реальные данные по вашему сайту появятся после регистрации и установки JS-кода.
+            </div>
+        </section>
+
+        <section class="demo-score-grid">
+            <article class="demo-score-card demo-score-main">
+                <span>Оценка сайта</span>
+                <strong>68<small>/100</small></strong>
+                <p>Есть точки для улучшения</p>
+            </article>
+            <article class="demo-score-card">
+                <span>Статус</span>
+                <strong>Требует внимания</strong>
+                <p>Сайт получает трафик, но часть посетителей не доходит до заявки.</p>
+            </article>
+            <article class="demo-score-card">
+                <span>Главная проблема</span>
+                <strong>Слабый первый экран</strong>
+                <p>Посетителю не сразу понятно, почему стоит оставить заявку именно здесь.</p>
+            </article>
+        </section>
+
+        <section class="demo-panel demo-ai-panel">
+            <div class="demo-section-head">
+                <span class="eyebrow">AI-рекомендации</span>
+                <h2>Краткий AI-вывод</h2>
+                <p>Сайт получает трафик, но часть посетителей может уходить без обращения. Нужно усилить первый экран, сделать кнопку заявки заметнее и добавить больше доверительных блоков.</p>
+            </div>
+            <div class="demo-ai-grid">
+                <div>
+                    <h3>Что хорошо</h3>
+                    <ul>
+                        <li>Сайт открывается быстро.</li>
+                        <li>Контакты доступны.</li>
+                        <li>Есть мобильная версия.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>Что мешает заявкам</h3>
+                    <ul>
+                        <li>Слабый призыв к действию на первом экране.</li>
+                        <li>Мало доверия: отзывов, кейсов, гарантий.</li>
+                        <li>Часть страниц получает трафик, но не ведёт к заявке.</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3>Что сделать первым</h3>
+                    <ol>
+                        <li>Добавить заметную кнопку “Оставить заявку” на первом экране.</li>
+                        <li>Добавить отзывы клиентов.</li>
+                        <li>Улучшить заголовки услуг под поисковые запросы.</li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
+        <section class="demo-panel">
+            <div class="demo-section-head">
+                <span class="eyebrow">Поведение посетителей</span>
+                <h2>Что делают люди на сайте</h2>
+                <p>После установки JS-кода сервис сможет видеть реальные действия посетителей: клики по WhatsApp, телефону, email, формам и важным кнопкам.</p>
+            </div>
+            <div class="demo-metric-grid">
+                <article><span>Просмотры страниц</span><strong>1 240</strong></article>
+                <article><span>Посетители</span><strong>418</strong></article>
+                <article><span>WhatsApp</span><strong>36</strong></article>
+                <article><span>Телефон</span><strong>22</strong></article>
+                <article><span>Email</span><strong>9</strong></article>
+                <article><span>Формы</span><strong>14</strong></article>
+            </div>
+        </section>
+
+        <section class="demo-two-column">
+            <article class="demo-panel">
+                <div class="demo-section-head">
+                    <span class="eyebrow">Источники трафика</span>
+                    <h2>Откуда приходят посетители</h2>
+                    <p>Источник трафика показывает, откуда приходят посетители сайта.</p>
+                </div>
+                <div class="demo-bars">
+                    <div><span>Google Search</span><strong>58%</strong><em style="width: 58%"></em></div>
+                    <div><span>Direct</span><strong>17%</strong><em style="width: 17%"></em></div>
+                    <div><span>Facebook</span><strong>12%</strong><em style="width: 12%"></em></div>
+                    <div><span>WhatsApp</span><strong>8%</strong><em style="width: 8%"></em></div>
+                    <div><span>Referral</span><strong>5%</strong><em style="width: 5%"></em></div>
+                </div>
+            </article>
+
+            <article class="demo-panel">
+                <div class="demo-section-head">
+                    <span class="eyebrow">Скорость сайта</span>
+                    <h2>PageSpeed</h2>
+                    <p>На компьютере сайт работает хорошо, но мобильную скорость стоит улучшить. Это важно, потому что большинство клиентов открывают сайт с телефона.</p>
+                </div>
+                <div class="demo-device-grid">
+                    <div><span>Мобильная версия</span><strong>62<small>/100</small></strong></div>
+                    <div><span>Компьютерная версия</span><strong>84<small>/100</small></strong></div>
+                </div>
+            </article>
+        </section>
+
+        <section class="demo-two-column">
+            <article class="demo-panel">
+                <div class="demo-section-head">
+                    <span class="eyebrow">SEO</span>
+                    <h2>Google Search Console</h2>
+                    <p>После подключения Search Console сервис сможет объединять SEO-данные с поведением посетителей.</p>
+                </div>
+                <div class="demo-search-metrics">
+                    <div><span>Клики из Google</span><strong>312</strong></div>
+                    <div><span>Показы</span><strong>8 900</strong></div>
+                    <div><span>Средняя позиция</span><strong>14.8</strong></div>
+                    <div><span>CTR</span><strong>3.5%</strong></div>
+                </div>
+                <div class="demo-query-list">
+                    <span>ремонт кондиционеров ашдод</span>
+                    <span>чистка кондиционера цена</span>
+                    <span>мастер кондиционеров израиль</span>
+                </div>
+            </article>
+
+            <article class="demo-panel">
+                <div class="demo-section-head">
+                    <span class="eyebrow">Код подключения</span>
+                    <h2>Зачем нужен JS-код</h2>
+                    <p>Добавьте небольшой JS-код на сайт, чтобы начать собирать реальные посещения, клики и действия пользователей.</p>
+                </div>
+                <p class="demo-code-warning">Это пример кода для демо. После регистрации сервис создаст ваш личный код подключения.</p>
+                <pre class="demo-code-block"><code id="demoInstallCode">&lt;script src="https://translator-word.com/static/tracker/tracker.js" data-site-id="demo"&gt;&lt;/script&gt;</code></pre>
+                <button class="btn btn-secondary" type="button" id="demoCopyCode">Скопировать пример</button>
+            </article>
+        </section>
+
+        <section class="demo-panel">
+            <div class="demo-section-head">
+                <span class="eyebrow">История анализа</span>
+                <h2>Что менялось по сайту</h2>
+            </div>
+            <div class="demo-history">
+                <article><strong>Сегодня</strong><span>AI нашёл слабый призыв к заявке на первом экране.</span></article>
+                <article><strong>Вчера</strong><span>Search Console показала рост показов по запросам услуг.</span></article>
+                <article><strong>7 дней назад</strong><span>После улучшения скорости уменьшилось количество быстрых уходов.</span></article>
+            </div>
+        </section>
+
+        <section class="demo-cta">
+            <span class="eyebrow">Хотите такой отчёт для своего сайта?</span>
+            <h2>Проверьте сайт бесплатно или подключите полный кабинет</h2>
+            <div class="landing-actions">
+                <a class="btn btn-primary" href="/free-check">Проверить сайт бесплатно</a>
+                <a class="btn btn-secondary" href="/register">Зарегистрироваться и подключить сайт</a>
+            </div>
+        </section>
+        <footer class="landing-footer">
+            <a href="/privacy">Конфиденциальность</a>
+            <a href="/terms">Условия</a>
+            <a href="/contact">Контакты</a>
+        </footer>
+    </main>
+
+    <script src="/static/js/ui.js?v=20260711-stage12"></script>
+    <script>
+        (function() {
+            var button = document.getElementById('demoCopyCode');
+            var code = document.getElementById('demoInstallCode');
+            if (!button || !code) {
+                return;
+            }
+            button.addEventListener('click', function() {
+                navigator.clipboard.writeText(code.textContent).then(function() {
+                    button.textContent = 'Скопировано';
+                    setTimeout(function() {
+                        button.textContent = 'Скопировать пример';
+                    }, 1600);
+                }).catch(function() {
+                    button.textContent = 'Скопируйте вручную';
+                });
+            });
+        })();
+    </script>
+</body>
+</html>

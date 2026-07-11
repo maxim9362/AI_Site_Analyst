@@ -1,0 +1,75 @@
+{% extends "user_base.html" %}
+
+{% block title %}{{ client.name }} - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header client-detail-header">
+    <div>
+        <a href="/clients" class="back-link">Клиенты</a>
+        <span class="eyebrow">Клиент</span>
+        <h1>{{ client.name }}</h1>
+        <p>Сайты клиента, состояние проектов и быстрые действия.</p>
+    </div>
+    <a class="btn btn-primary" href="/sites/new">Добавить сайт для клиента</a>
+</div>
+
+<section class="client-detail-grid">
+    <article class="client-info-card">
+        <span class="eyebrow">Контакт</span>
+        {% if client.contact_name or client.email or client.phone %}
+        <div class="client-contact-list">
+            {% if client.contact_name %}<p><strong>Имя:</strong> {{ client.contact_name }}</p>{% endif %}
+            {% if client.email %}<p><strong>Email:</strong> {{ client.email }}</p>{% endif %}
+            {% if client.phone %}<p><strong>Телефон:</strong> {{ client.phone }}</p>{% endif %}
+        </div>
+        {% else %}
+        <p>Контактные данные пока не указаны.</p>
+        {% endif %}
+    </article>
+    <article class="client-info-card">
+        <span class="eyebrow">Заметки</span>
+        <p>{{ client.notes or "Заметок пока нет." }}</p>
+    </article>
+</section>
+
+<section class="client-sites-section">
+    <div class="section-heading-row">
+        <div>
+            <span class="eyebrow">Сайты клиента</span>
+            <h2>Клиентские сайты</h2>
+        </div>
+        <a class="btn btn-secondary" href="/sites/new">Добавить сайт</a>
+    </div>
+
+    {% if sites %}
+    <div class="client-site-list">
+        {% for row in sites %}
+        {% set site = row.site %}
+        <article class="site-mobile-card client-site-card">
+            <div class="site-mobile-card-head">
+                <div>
+                    <h2>{{ site.name }}</h2>
+                    <p>{{ site.domain }}</p>
+                </div>
+                <span class="status {{ 'status-inactive' if row.needs_attention else 'status-active' }}">{{ row.status_label }}</span>
+            </div>
+            <div class="client-site-meta">
+                <span>Оценка: {{ row.score }}/100</span>
+                <span>Последний анализ: {{ row.latest_analysis_label }}</span>
+            </div>
+            <div class="site-mobile-actions">
+                <a class="btn btn-primary" href="/sites/{{ site.site_id }}">Открыть аналитику</a>
+                <a class="btn btn-secondary" href="/sites/{{ site.site_id }}/install">Код подключения</a>
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h2>У клиента пока нет сайтов</h2>
+        <p>Добавьте сайт для клиента, чтобы видеть аналитику и рекомендации в одной карточке.</p>
+        <a class="btn btn-primary" href="/sites/new">Добавить сайт для клиента</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

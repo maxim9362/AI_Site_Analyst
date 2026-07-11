@@ -15,7 +15,7 @@ class SiteCreate(SiteBase):
 
 
 class UserSiteCreate(SiteBase):
-    pass
+    client_id: uuid.UUID | None = None
 
 
 class SiteRead(SiteBase):

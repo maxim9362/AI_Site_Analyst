@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Регистрация - AI Site Analyst</title>
     <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
-    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check3">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260711-stage12">
 </head>
 <body class="auth-body">
     <nav class="navbar auth-navbar">
@@ -17,20 +17,41 @@
             </a>
         </div>
         <div class="nav-links">
-            <a href="/">Проверить сайт бесплатно</a>
+            <a href="/free-check">Проверить сайт бесплатно</a>
+            <a href="/demo">Посмотреть демо</a>
             <a href="/login">Вход</a>
         </div>
     </nav>
-    <main class="auth-shell">
-        <section class="login-card auth-card">
-            <span class="eyebrow">Новый аккаунт</span>
-            <h1>Регистрация</h1>
-            <p>Создайте аккаунт, чтобы подключать сайты и получать AI-рекомендации.</p>
-            <div class="auth-free-check-card">
-                <strong>Можно начать без регистрации</strong>
-                <span>Проверьте сайт бесплатно, а потом подключите полный анализ.</span>
-                <a href="/">Открыть проверку сайта</a>
+    <div class="mobile-floating-nav" data-mobile-menu>
+        <button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню" aria-controls="mobileFloatingMenu" aria-expanded="false">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <nav class="mobile-menu-panel" id="mobileFloatingMenu" data-mobile-menu-panel aria-label="Мобильное меню">
+            <a class="mobile-menu-primary" href="/free-check">Бесплатная проверка</a>
+            <a href="/demo">Демо</a>
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        </nav>
+    </div>
+    <main class="auth-shell auth-funnel-shell">
+        <section class="auth-funnel">
+            <div class="auth-funnel-copy">
+                <span class="section-kicker">Полный анализ сайта</span>
+                <h1>Создайте аккаунт</h1>
+                <p>Подключите сайт, получите код установки и смотрите полный AI-анализ с реальными данными.</p>
+                <div class="auth-feature-list" aria-label="Что будет после регистрации">
+                    <span>Код подключения</span>
+                    <span>Реальные посетители</span>
+                    <span>Клики и заявки</span>
+                    <span>Источники трафика</span>
+                    <span>AI-рекомендации</span>
+                </div>
             </div>
+
+            <div class="login-card auth-card auth-funnel-card">
+                <span class="eyebrow">Новый аккаунт</span>
+                <h2>Регистрация</h2>
+                <p>Создайте аккаунт, чтобы подключить сайт и получить полный отчёт.</p>
             {% if site_url %}
             <div class="alert alert-success">После регистрации подключите сайт: {{ site_url }}</div>
             {% endif %}
@@ -61,10 +82,13 @@
                 <button type="submit" class="btn btn-primary">Создать аккаунт</button>
             </form>
             <div class="auth-links">
-                <a href="/">Проверить другой сайт бесплатно</a>
-                <a href="/login">Уже есть аккаунт?</a>
+                <a href="/free-check">Проверить сайт бесплатно</a>
+                <a href="/demo">Посмотреть демо</a>
+                <a href="/login">Уже есть аккаунт? Войти</a>
+            </div>
             </div>
         </section>
     </main>
+    <script src="/static/js/ui.js?v=20260711-stage12"></script>
 </body>
 </html>

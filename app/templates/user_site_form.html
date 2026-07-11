@@ -14,6 +14,15 @@
 
 <section class="login-card form-card">
     {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    {% if account_limits %}
+    <div class="account-mode-inline">
+        <div>
+            <span class="eyebrow">Режим аккаунта</span>
+            <strong>{{ account_limits.label }}</strong>
+        </div>
+        <p>Можно добавить до {{ account_limits.max_sites }} сайтов. Сейчас подключено: {{ current_site_count }}.</p>
+    </div>
+    {% endif %}
     <form method="POST" action="/sites/new">
         <div class="form-group">
             <label for="name">Название сайта</label>
@@ -26,12 +35,26 @@
             <p class="helper-text">Без лишних путей. Можно указать домен с www или без него.</p>
         </div>
         <div class="form-group">
+            <label for="client_id">Клиент</label>
+            <select id="client_id" name="client_id">
+                <option value="">Без клиента</option>
+                {% for client in client_options or [] %}
+                <option value="{{ client.id }}" {% if selected_client_id == client.id|string %}selected{% endif %}>{{ client.name }}</option>
+                {% endfor %}
+            </select>
+            {% if client_options %}
+            <p class="helper-text">Выберите клиента, если сайт относится к клиентскому проекту.</p>
+            {% else %}
+            <p class="helper-text">Вы можете добавить клиента позже.</p>
+            {% endif %}
+        </div>
+        <div class="form-group">
             <label for="allowed_domains">Разрешенные домены</label>
             <textarea id="allowed_domains" name="allowed_domains" rows="4" placeholder="example.com&#10;www.example.com">{{ allowed_domains }}</textarea>
             <p class="helper-text">Каждый домен с новой строки. Это защитит трекер от чужих сайтов.</p>
         </div>
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Сохранить сайт</button>
+            <button type="submit" class="btn btn-primary" {% if limit_reached %}disabled{% endif %}>Сохранить сайт</button>
             <a class="btn btn-secondary" href="/sites">Отмена</a>
         </div>
     </form>

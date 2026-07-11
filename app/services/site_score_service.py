@@ -136,7 +136,7 @@ def _calculate_structure_score(
         return 25, "Структура сайта пока не проанализирована."
 
     if not classifications and chunks:
-        return 50, "База знаний есть, но AI-классификация блоков еще не готова."
+        return 50, "Данные сайта собраны, но анализ блоков еще не завершен."
 
     categories = {cls.category for cls in classifications}
     score = 0

@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from datetime import timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, Response, status
@@ -11,6 +12,7 @@ from app.core.config import settings
 from app.core.rate_limit import check_rate_limit
 from app.core.user_auth import USER_COOKIE, sign_user_session, verify_user_session_with_timestamp
 from app.db.database import get_db
+from app.schemas.client import ClientCreate
 from app.schemas.site import UserSiteCreate
 from app.schemas.user import UserCreate
 from app.services.demo_site_bootstrap_service import create_demo_site_for_user
@@ -18,7 +20,9 @@ from app.services.email_service import EmailService
 from app.services.google_auth_service import GoogleAuthError, GoogleAuthService
 from app.services.gsc_oauth_service import GSCOAuthService
 from app.services.gsc_service import GSCService
-from app.services.site_service import SiteService
+from app.services.partner_client_service import PartnerClientService
+from app.services.plan_limits import get_plan_limits, site_limit_message
+from app.services.site_service import AccountSiteLimitError, ClientAccessError, SiteService
 from app.services.url_normalization import normalize_public_url
 from app.services.user_service import (
     CurrentPasswordInvalidError,
@@ -702,23 +706,205 @@ async def user_sites(request: Request, db: AsyncSession = Depends(get_db)):
     if not user_id:
         return _redirect("/login")
 
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
     sites = await SiteService(db).list_sites_by_user(user_id)
-    site_rows = [{"site": site, "public_url": _site_public_url(site.domain)} for site in sites]
-    return templates.TemplateResponse(request, "user_sites.html", {"sites": site_rows})
+    partner_service = PartnerClientService(db)
+    partner_site_rows = await partner_service.build_site_rows(user_id, sites)
+    site_rows = [
+        {
+            "site": row["site"],
+            "public_url": _site_public_url(row["site"].domain),
+            "client": row["client"],
+            "score": row["score"],
+            "status_label": row["status_label"],
+            "needs_attention": row["needs_attention"],
+            "latest_analysis_label": row["latest_analysis_label"],
+            "has_tracker_events": row["has_tracker_events"],
+        }
+        for row in partner_site_rows
+    ]
+    partner_overview = await partner_service.get_partner_overview(user_id, partner_site_rows)
+    return templates.TemplateResponse(
+        request,
+        "user_sites.html",
+        {
+            "sites": site_rows,
+            "account_limits": account_limits,
+            "current_site_count": len(sites),
+            "partner_overview": partner_overview,
+        },
+    )
+
+
+@router.get("/clients")
+async def user_clients(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    if not account_limits.can_use_partner_clients:
+        return templates.TemplateResponse(
+            request,
+            "user_clients.html",
+            {"clients": [], "account_limits": account_limits, "partner_unavailable": True},
+        )
+
+    clients = await PartnerClientService(db).list_clients_summary(user_id)
+    return templates.TemplateResponse(
+        request,
+        "user_clients.html",
+        {"clients": clients, "account_limits": account_limits, "partner_unavailable": False},
+    )
+
+
+@router.get("/clients/new")
+async def new_user_client_page(request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    if not account_limits.can_use_partner_clients:
+        return templates.TemplateResponse(
+            request,
+            "user_client_form.html",
+            {
+                "error": "Партнёрский режим недоступен в текущем режиме аккаунта. Для включения партнёрского режима обратитесь к администратору сервиса.",
+                "name": "",
+                "contact_name": "",
+                "email": "",
+                "phone": "",
+                "notes": "",
+                "partner_unavailable": True,
+            },
+        )
+
+    return templates.TemplateResponse(
+        request,
+        "user_client_form.html",
+        {
+            "error": None,
+            "name": "",
+            "contact_name": "",
+            "email": "",
+            "phone": "",
+            "notes": "",
+            "partner_unavailable": False,
+        },
+    )
+
+
+@router.post("/clients/new")
+async def create_user_client(
+    request: Request,
+    name: str = Form(...),
+    contact_name: str = Form(""),
+    email: str = Form(""),
+    phone: str = Form(""),
+    notes: str = Form(""),
+    db: AsyncSession = Depends(get_db),
+):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    if not account_limits.can_use_partner_clients:
+        return templates.TemplateResponse(
+            request,
+            "user_client_form.html",
+            {
+                "error": "Партнёрский режим недоступен в текущем режиме аккаунта. Для включения партнёрского режима обратитесь к администратору сервиса.",
+                "name": name,
+                "contact_name": contact_name,
+                "email": email,
+                "phone": phone,
+                "notes": notes,
+                "partner_unavailable": True,
+            },
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+    client_name = name.strip()
+    if not client_name:
+        return templates.TemplateResponse(
+            request,
+            "user_client_form.html",
+            {
+                "error": "Укажите название клиента.",
+                "name": name,
+                "contact_name": contact_name,
+                "email": email,
+                "phone": phone,
+                "notes": notes,
+                "partner_unavailable": False,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    client = await PartnerClientService(db).create_client(
+        user_id,
+        ClientCreate(
+            name=client_name,
+            contact_name=contact_name.strip() or None,
+            email=email.strip().lower() or None,
+            phone=phone.strip() or None,
+            notes=notes.strip() or None,
+        ),
+    )
+    return _redirect(f"/clients/{client.id}")
+
+
+@router.get("/clients/{client_id}")
+async def user_client_detail(client_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db)):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
+        return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    if not account_limits.can_use_partner_clients:
+        return _redirect("/clients")
+
+    data = await PartnerClientService(db).get_client_detail(user_id, client_id)
+    if not data:
+        return _redirect("/clients")
+    return templates.TemplateResponse(request, "user_client_detail.html", data)
 
 
 @router.get("/sites/new")
 async def new_site_page(request: Request, db: AsyncSession = Depends(get_db)):
-    if not await _get_current_user_id(request, db):
+    user_id = await _get_current_user_id(request, db)
+    if not user_id:
         return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    client_options = (
+        await PartnerClientService(db).get_user_client_options(user_id)
+        if account_limits.can_use_partner_clients
+        else []
+    )
+    current_site_count = len(await SiteService(db).list_sites_by_user(user_id))
+    limit_error = site_limit_message(account_limits) if current_site_count >= account_limits.max_sites else None
     return templates.TemplateResponse(
         request,
         "user_site_form.html",
         {
-            "error": None,
+            "error": limit_error,
             "name": "",
             "domain": "",
             "allowed_domains": "",
+            "account_limits": account_limits,
+            "current_site_count": current_site_count,
+            "limit_reached": limit_error is not None,
+            "client_options": client_options,
+            "selected_client_id": "",
         },
     )
 
@@ -729,11 +915,60 @@ async def create_user_site(
     name: str = Form(...),
     domain: str = Form(...),
     allowed_domains: str = Form(""),
+    client_id: str = Form(""),
     db: AsyncSession = Depends(get_db),
 ):
     user_id = await _get_current_user_id(request, db)
     if not user_id:
         return _redirect("/login")
+
+    user = await UserService(db).get_user_by_id(user_id)
+    account_limits = get_plan_limits(user.account_plan if user else None)
+    client_options = (
+        await PartnerClientService(db).get_user_client_options(user_id)
+        if account_limits.can_use_partner_clients
+        else []
+    )
+    current_site_count = len(await SiteService(db).list_sites_by_user(user_id))
+    if current_site_count >= account_limits.max_sites:
+        return templates.TemplateResponse(
+            request,
+            "user_site_form.html",
+            {
+                "error": site_limit_message(account_limits),
+                "name": name,
+                "domain": domain,
+                "allowed_domains": allowed_domains,
+                "account_limits": account_limits,
+                "current_site_count": current_site_count,
+                "limit_reached": True,
+                "client_options": client_options,
+                "selected_client_id": client_id,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    selected_client_uuid = None
+    if client_id.strip():
+        try:
+            selected_client_uuid = uuid.UUID(client_id.strip())
+        except ValueError:
+            return templates.TemplateResponse(
+                request,
+                "user_site_form.html",
+                {
+                    "error": "Выберите клиента из списка или оставьте поле пустым.",
+                    "name": name,
+                    "domain": domain,
+                    "allowed_domains": allowed_domains,
+                    "account_limits": account_limits,
+                    "current_site_count": current_site_count,
+                    "limit_reached": False,
+                    "client_options": client_options,
+                    "selected_client_id": client_id,
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
     domain_value = domain.strip()
     allowed_domain_values = [item.strip() for item in allowed_domains.splitlines() if item.strip()]
@@ -742,21 +977,62 @@ async def create_user_site(
             name=name.strip(),
             domain=domain_value,
             allowed_domains=allowed_domain_values or [domain_value],
+            client_id=selected_client_uuid,
         )
     except ValidationError:
         return templates.TemplateResponse(
             request,
             "user_site_form.html",
             {
-                "error": "Enter a site name and domain.",
+                "error": "Укажите название сайта и домен.",
                 "name": name,
                 "domain": domain,
                 "allowed_domains": allowed_domains,
+                "account_limits": account_limits,
+                "current_site_count": current_site_count,
+                "limit_reached": False,
+                "client_options": client_options,
+                "selected_client_id": client_id,
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
 
-    site = await SiteService(db).create_site_for_user(user_id, site_data)
+    try:
+        site = await SiteService(db).create_site_for_user(user_id, site_data)
+    except AccountSiteLimitError as exc:
+        return templates.TemplateResponse(
+            request,
+            "user_site_form.html",
+            {
+                "error": str(exc),
+                "name": name,
+                "domain": domain,
+                "allowed_domains": allowed_domains,
+                "account_limits": account_limits,
+                "current_site_count": current_site_count,
+                "limit_reached": True,
+                "client_options": client_options,
+                "selected_client_id": client_id,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    except ClientAccessError:
+        return templates.TemplateResponse(
+            request,
+            "user_site_form.html",
+            {
+                "error": "Выберите клиента из списка или оставьте поле пустым.",
+                "name": name,
+                "domain": domain,
+                "allowed_domains": allowed_domains,
+                "account_limits": account_limits,
+                "current_site_count": current_site_count,
+                "limit_reached": False,
+                "client_options": client_options,
+                "selected_client_id": client_id,
+            },
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
     return _redirect(f"/sites/{site.site_id}/install")
 
 

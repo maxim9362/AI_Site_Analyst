@@ -1,0 +1,46 @@
+{% extends "user_base.html" %}
+
+{% block title %}Добавить клиента - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header form-page-header">
+    <div>
+        <span class="eyebrow">Новый клиент</span>
+        <h1>Добавить клиента</h1>
+        <p>Создайте карточку клиента, чтобы группировать сайты, отчёты и дальнейшие доработки.</p>
+    </div>
+    <a class="btn btn-secondary" href="/clients">Клиенты</a>
+</div>
+
+<section class="login-card form-card">
+    {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
+    <form method="POST" action="/clients/new">
+        <div class="form-group">
+            <label for="name">Название клиента</label>
+            <input type="text" id="name" name="name" value="{{ name }}" placeholder="Например: ZemiPro" required {% if partner_unavailable %}disabled{% endif %}>
+        </div>
+        <div class="form-group">
+            <label for="contact_name">Контактное лицо</label>
+            <input type="text" id="contact_name" name="contact_name" value="{{ contact_name }}" placeholder="Имя клиента" {% if partner_unavailable %}disabled{% endif %}>
+        </div>
+        <div class="form-grid two">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ email }}" placeholder="client@example.com" {% if partner_unavailable %}disabled{% endif %}>
+            </div>
+            <div class="form-group">
+                <label for="phone">Телефон</label>
+                <input type="text" id="phone" name="phone" value="{{ phone }}" placeholder="+972..." {% if partner_unavailable %}disabled{% endif %}>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="notes">Заметки</label>
+            <textarea id="notes" name="notes" rows="4" placeholder="Что важно помнить по проекту" {% if partner_unavailable %}disabled{% endif %}>{{ notes }}</textarea>
+        </div>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" {% if partner_unavailable %}disabled{% endif %}>Добавить клиента</button>
+            <a class="btn btn-secondary" href="/clients">Отмена</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

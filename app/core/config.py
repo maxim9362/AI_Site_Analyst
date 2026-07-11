@@ -97,7 +97,7 @@ class Settings(BaseSettings):
                 "detail": "PAGESPEED_API_KEY",
             },
             "gemini": {
-                "label": "Gemini AI",
+                "label": "AI-анализ",
                 "configured": self.gemini_configured,
                 "detail": "GEMINI_API_KEY",
             },

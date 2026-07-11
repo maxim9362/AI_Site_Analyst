@@ -6,9 +6,9 @@
 <section class="dashboard-section">
     <div class="page-header form-page-header">
         <div>
-            <span class="eyebrow">Production</span>
-            <h1>Интеграции и реальные токены</h1>
-            <p>Статус переменных сервера. Секретные значения не отображаются.</p>
+            <span class="eyebrow">Подключения</span>
+            <h1>Интеграции сервиса</h1>
+            <p>Здесь видно, какие внешние сервисы готовы к работе. Секретные значения не отображаются.</p>
         </div>
     </div>
 
@@ -28,23 +28,6 @@
         {% endfor %}
     </div>
 
-    <div class="settings-summary">
-        <div>
-            <span>APP_ENV</span>
-            <strong>{{ app_env }}</strong>
-        </div>
-        <div>
-            <span>APP_BASE_URL</span>
-            <strong>{{ app_base_url }}</strong>
-        </div>
-        <div>
-            <span>GOOGLE_REDIRECT_URI</span>
-            <strong>{{ google_redirect_uri }}</strong>
-        </div>
-        <div>
-            <span>REQUIRE_EXTERNAL_INTEGRATIONS</span>
-            <strong>{{ require_external_integrations }}</strong>
-        </div>
-    </div>
+    <p class="helper-text">Если нужная интеграция не подключена, некоторые данные могут быть недоступны. Кабинет продолжит работать с теми источниками, которые уже настроены.</p>
 </section>
 {% endblock %}

@@ -113,20 +113,41 @@
             <p>Период: {{ dashboard.period_label }}</p>
         </div>
 
-        <div class="metric-toggle-row" data-chart-toggles>
-            {% for series in dashboard.chart_data.series %}
-            <label class="metric-toggle {{ 'is-disabled' if series.disabled }}" style="--metric-color: {{ series.color }}">
-                <input type="checkbox" value="{{ series.key }}" {{ 'checked' if not series.disabled }} {{ 'disabled' if series.disabled }}>
-                <span>{{ series.label }}</span>
-                {% if series.disabled and dashboard.chart_data.gsc_message %}
-                <span class="toggle-hint">{{ dashboard.chart_data.gsc_message }}</span>
-                {% endif %}
+        <div class="chart-toolbar" data-chart-toggles>
+            <label class="chart-toggle" style="--metric-color: #2563eb">
+                <input type="checkbox" value="site_visits" checked>
+                <span>Посещения сайта</span>
             </label>
-            {% endfor %}
+            <label class="chart-toggle" style="--metric-color: #0ea5e9">
+                <input type="checkbox" value="pageviews" checked>
+                <span>Просмотры страниц</span>
+            </label>
+            <label class="chart-toggle is-disabled" style="--metric-color: #16a34a">
+                <input type="checkbox" value="seo_impressions" disabled>
+                <span>SEO показы</span>
+                <span class="toggle-hint">GSC не подключен</span>
+            </label>
+            <label class="chart-toggle is-disabled" style="--metric-color: #dc2626">
+                <input type="checkbox" value="seo_clicks" disabled>
+                <span>SEO клики</span>
+                <span class="toggle-hint">GSC не подключен</span>
+            </label>
+            <label class="chart-toggle is-disabled" style="--metric-color: #f59e0b">
+                <input type="checkbox" value="ctr" disabled>
+                <span>CTR</span>
+                <span class="toggle-hint">GSC не подключен</span>
+            </label>
+            <label class="chart-toggle is-disabled" style="--metric-color: #7c3aed">
+                <input type="checkbox" value="position" disabled>
+                <span>Средняя позиция</span>
+                <span class="toggle-hint">GSC не подключен</span>
+            </label>
         </div>
 
-        <div class="chart-shell">
-            <canvas id="performanceChart" data-chart='{{ dashboard.chart_data | tojson }}' width="1200" height="420"></canvas>
+        <script id="performance-data" type="application/json">{{ dashboard.performance_chart_data | tojson }}</script>
+
+        <div class="chart-wrapper">
+            <canvas id="performanceChart" width="900" height="320"></canvas>
             <div id="chartEmpty" class="chart-empty" style="display:none;">
                 Пока недостаточно данных для графика. Система собирает посещения.
             </div>
@@ -134,16 +155,8 @@
 
         <div class="chart-note">
             <p>График показывает динамику метрик. Точные значения смотрите в карточках и таблицах ниже.</p>
-            {% if dashboard.chart_data.gsc_available_for_period %}
-            <p class="chart-note-hint">Для средней позиции меньшее число означает лучший результат.</p>
-            {% endif %}
+            <p class="chart-note-hint">SEO-показы, клики, CTR и позиции станут доступны после подключения Google Search Console.</p>
         </div>
-
-        {% if dashboard.chart_data.gsc_message %}
-        <div class="gsc-empty-state">
-            {{ dashboard.chart_data.gsc_message }}
-        </div>
-        {% endif %}
     </div>
 </section>
 

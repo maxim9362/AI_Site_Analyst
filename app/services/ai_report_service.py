@@ -1,6 +1,8 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,8 +15,11 @@ from app.repositories.site_repository import SiteRepository
 from app.schemas.ai_report import AIReportRead
 from app.services.ai_service import ai_service
 from app.services.analytics_service import AnalyticsService
+from app.services.demo_page_service import render_demo_html
 from app.services.gsc_service import GSCService
 from app.services.pagespeed_service import PageSpeedService
+from app.services.public_site_check_service import SiteSignalParser, _fetch_html_sync
+from app.services.url_normalization import normalize_public_url
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +46,7 @@ class AIReportService:
         snapshots: list,
         gsc_data: dict,
         pagespeed_data: dict,
+        page_signals: dict | None = None,
     ) -> str:
         # Контекст собирается только из фактов: аналитика, тексты сайта, классификации, снимки и GSC.
         parts = []
@@ -55,7 +61,7 @@ class AIReportService:
                 "Если Search Console данные есть, анализируй SEO-показы, клики, CTR, позиции и запросы вместе с поведением пользователей на сайте."
             )
         else:
-            parts.append("Google Search Console data is not connected.")
+            parts.append("Search Console не подключена.")
             parts.append("Если Search Console данных нет, не делай выводы про позиции, показы, CTR или SEO-запросы.")
 
         # Traffic sources context for AI analysis.
@@ -76,10 +82,18 @@ class AIReportService:
         if pagespeed_data:
             parts.append(json.dumps({"pagespeed": pagespeed_data}, ensure_ascii=False, default=str)[:3000])
             parts.append(
-                "Если PageSpeed данные есть, анализируй скорость, Core Web Vitals, accessibility, best practices и технические SEO-проблемы вместе с поведением пользователей."
+                "Если данные PageSpeed есть, анализируй скорость, удобство, доступность, техническое качество и SEO-проблемы вместе с поведением пользователей."
             )
         else:
-            parts.append("PageSpeed Insights data is not collected yet.")
+            parts.append("Данные PageSpeed пока не собраны.")
+
+        if page_signals:
+            parts.append("\n=== ПРИЗНАКИ ОТКРЫТОЙ СТРАНИЦЫ ===")
+            parts.append(json.dumps({"open_page": page_signals}, ensure_ascii=False, default=str)[:3000])
+            parts.append(
+                "Это признаки открытой страницы: заголовок, подзаголовки, кнопки действия, формы, контакты и фрагменты текста. "
+                "Используй их вместе с данными JS-кода, Search Console и PageSpeed. Не придумывай факты, которых нет."
+            )
 
         if chunks:
             parts.append("\n=== ТЕКСТЫ САЙТА ===")
@@ -112,6 +126,43 @@ class AIReportService:
 
         return context
 
+    def _build_page_signals_from_html(self, html: str, status_code: int, final_url: str) -> dict:
+        parser = SiteSignalParser()
+        parser.feed(html)
+        signals = parser.finish()
+        signals.status_code = status_code
+        signals.final_url = final_url
+        return {
+            "url": signals.final_url,
+            "status_code": signals.status_code,
+            "title": signals.title,
+            "meta_description": signals.meta_description,
+            "h1": signals.h1[:3],
+            "h2": signals.h2[:8],
+            "cta_texts": signals.cta_texts[:8],
+            "forms_count": signals.forms_count,
+            "contact_links_count": len(signals.contact_links),
+            "sections_count": signals.sections_count,
+            "text_length": signals.text_length,
+            "text_snippets": signals.text_snippets[:6],
+        }
+
+    async def _get_open_page_signals(self, public_site_id: str, domain: str) -> dict | None:
+        public_url = normalize_public_url(domain)
+        parsed = urlparse(public_url)
+        host = (parsed.hostname or "").lower()
+
+        try:
+            if host in {"localhost", "127.0.0.1"}:
+                html = render_demo_html(public_site_id)
+                return self._build_page_signals_from_html(html, 200, f"/demo?site_id={public_site_id}")
+
+            html, status_code, final_url = await asyncio.to_thread(_fetch_html_sync, public_url)
+            return self._build_page_signals_from_html(html, status_code, final_url)
+        except Exception as exc:
+            logger.warning("Could not collect open page signals for %s: %s", public_site_id, str(exc).splitlines()[0][:160])
+            return None
+
     def _gsc_period_from_days(self, days: int) -> str:
         if days <= 1:
             return "24h"
@@ -139,7 +190,8 @@ class AIReportService:
             "time_series": await self.gsc_service.get_gsc_time_series(public_site_id, gsc_period),
         }
         pagespeed_data = await self.pagespeed_service.get_ai_context(public_site_id)
-        context = self._build_context(analytics, chunks, classifications, snapshots, gsc_data, pagespeed_data)
+        page_signals = await self._get_open_page_signals(public_site_id, site.domain)
+        context = self._build_context(analytics, chunks, classifications, snapshots, gsc_data, pagespeed_data, page_signals)
 
         logger.info(f"Generating AI report for site {public_site_id} ({report_type}, {days} days)")
 

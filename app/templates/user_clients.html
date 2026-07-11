@@ -1,0 +1,56 @@
+{% extends "user_base.html" %}
+
+{% block title %}Клиенты - AI Site Analyst{% endblock %}
+
+{% block content %}
+<div class="page-header clients-page-header">
+    <div>
+        <span class="eyebrow">Партнёрский режим</span>
+        <h1>Клиенты</h1>
+        <p>Группируйте сайты по клиентам, чтобы быстрее понимать, где нужны доработки и отчёты.</p>
+    </div>
+    <a class="btn btn-primary" href="/clients/new">Добавить клиента</a>
+</div>
+
+{% if partner_unavailable %}
+<section class="empty-state">
+    <span class="eyebrow">Режим аккаунта</span>
+    <h2>Партнёрский режим недоступен</h2>
+    <p>Партнёрский режим недоступен в текущем режиме аккаунта. Для включения партнёрского режима обратитесь к администратору сервиса.</p>
+</section>
+{% elif clients %}
+<section class="client-card-grid">
+    {% for row in clients %}
+    {% set client = row.client %}
+    <article class="client-card">
+        <div class="client-card-head">
+            <div>
+                <span class="eyebrow">Клиент</span>
+                <h2>{{ client.name }}</h2>
+            </div>
+            {% if row.attention_count %}
+            <span class="status status-inactive">Нужно внимание: {{ row.attention_count }}</span>
+            {% else %}
+            <span class="status status-active">В порядке</span>
+            {% endif %}
+        </div>
+        <div class="client-card-metrics">
+            <div><span>Сайтов</span><strong>{{ row.site_count }}</strong></div>
+            <div><span>Последняя активность</span><strong>{{ row.last_activity }}</strong></div>
+        </div>
+        <div class="site-mobile-actions">
+            <a class="btn btn-primary" href="/clients/{{ client.id }}">Открыть</a>
+            <a class="btn btn-secondary" href="/sites/new">Добавить сайт</a>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="empty-state">
+    <span class="eyebrow">Клиентские сайты</span>
+    <h2>У вас пока нет клиентов</h2>
+    <p>Добавьте клиента, чтобы группировать сайты и отчёты по проектам.</p>
+    <a class="btn btn-primary" href="/clients/new">Добавить клиента</a>
+</section>
+{% endif %}
+{% endblock %}

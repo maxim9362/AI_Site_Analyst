@@ -2269,7 +2269,15 @@ code,
     margin: 1rem 0;
 }
 
-.metric-toggle {
+.chart-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin: 1rem 0;
+}
+
+.metric-toggle,
+.chart-toggle {
     align-items: center;
     background: #f9fafb;
     border: 1px solid #e5e7eb;
@@ -2283,8 +2291,14 @@ code,
     padding: 0.45rem 0.7rem;
 }
 
-.metric-toggle.is-disabled {
+.metric-toggle.is-disabled,
+.chart-toggle.is-disabled {
     opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.chart-toggle input:disabled,
+.chart-toggle.is-disabled span {
     cursor: not-allowed;
 }
 
@@ -2292,6 +2306,23 @@ code,
     color: #9ca3af;
     font-size: 0.75rem;
     font-weight: 400;
+}
+
+.chart-wrapper {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    min-height: 320px;
+    overflow: hidden;
+    padding: 0.75rem;
+    position: relative;
+}
+
+.chart-wrapper canvas {
+    display: block;
+    height: 320px;
+    max-width: 100%;
+    width: 100%;
 }
 
 .chart-empty {

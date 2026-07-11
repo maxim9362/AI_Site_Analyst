@@ -38,11 +38,12 @@ function initAdminActions() {
 function initPerformanceChart() {
     var canvas = document.getElementById('performanceChart');
     var emptyEl = document.getElementById('chartEmpty');
-    if (!canvas || !canvas.dataset.chart) return;
+    var dataEl = document.getElementById('performance-data');
+    if (!canvas || !dataEl) return;
 
     var chartData;
     try {
-        chartData = JSON.parse(canvas.dataset.chart);
+        chartData = JSON.parse(dataEl.textContent || '{}');
     } catch (error) {
         return;
     }
@@ -77,13 +78,12 @@ function renderChart(canvas, emptyEl, chartData, enabledSeries) {
 function hasAnyData(chartData) {
     var labels = chartData.labels || [];
     if (!labels.length) return false;
-    var series = chartData.series || [];
-    for (var i = 0; i < series.length; i++) {
-        if (series[i].disabled) continue;
-        var values = series[i].values || [];
+    var keys = ['site_visits', 'pageviews'];
+    for (var i = 0; i < keys.length; i++) {
+        var values = chartData[keys[i]] || [];
         for (var j = 0; j < values.length; j++) {
-            var v = values[j];
-            if (typeof v === 'number' && !Number.isNaN(v) && v !== null && v !== undefined && v !== 0) {
+            var v = Number(values[j] || 0);
+            if (!Number.isNaN(v) && v > 0) {
                 return true;
             }
         }
@@ -111,10 +111,10 @@ function drawPerformanceChart(canvas, chartData, enabledSeries) {
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    var padding = { top: 24, right: 24, bottom: 42, left: 52 };
+    var padding = { top: 30, right: 24, bottom: 44, left: 54 };
     var plotWidth = width - padding.left - padding.right;
     var plotHeight = height - padding.top - padding.bottom;
-    var activeSeries = getDrawableSeries(chartData.series || [], enabledSeries);
+    var activeSeries = getDrawableSeries(chartData, enabledSeries);
 
     drawChartFrame(ctx, width, height, padding, plotWidth, plotHeight, chartData.labels || []);
 
@@ -123,23 +123,47 @@ function drawPerformanceChart(canvas, chartData, enabledSeries) {
         return;
     }
 
+    var maxValue = getChartMax(activeSeries);
     activeSeries.forEach(function(series) {
-        drawSeriesLine(ctx, series, chartData.labels || [], padding, plotWidth, plotHeight);
+        drawSeriesLine(ctx, series, chartData.labels || [], padding, plotWidth, plotHeight, maxValue);
     });
 
     drawLegend(ctx, activeSeries, padding.left, 20);
 }
 
-function getDrawableSeries(seriesList, enabledSeries) {
+function getDrawableSeries(chartData, enabledSeries) {
+    var seriesList = [
+        {
+            key: 'site_visits',
+            label: 'Посещения сайта',
+            color: '#2563eb',
+            values: chartData.site_visits || [],
+        },
+        {
+            key: 'pageviews',
+            label: 'Просмотры страниц',
+            color: '#0ea5e9',
+            values: chartData.pageviews || [],
+        },
+    ];
+
     return seriesList.filter(function(series) {
-        if (series.disabled) return false;
         if (!enabledSeries[series.key]) return false;
-        var values = series.values || [];
-        if (!values.length) return false;
-        return values.some(function(value) {
-            return typeof value === 'number' && !Number.isNaN(value) && value !== null && value !== undefined;
+        return series.values && series.values.length;
+    });
+}
+
+function getChartMax(seriesList) {
+    var maxValue = 1;
+    seriesList.forEach(function(series) {
+        (series.values || []).forEach(function(value) {
+            var numberValue = Number(value || 0);
+            if (!Number.isNaN(numberValue)) {
+                maxValue = Math.max(maxValue, numberValue);
+            }
         });
     });
+    return maxValue;
 }
 
 function drawChartFrame(ctx, width, height, padding, plotWidth, plotHeight, labels) {
@@ -174,16 +198,9 @@ function pickAxisLabels(labels) {
         .filter(function(item) { return item.index % step === 0 || item.index === labels.length - 1; });
 }
 
-function drawSeriesLine(ctx, series, labels, padding, plotWidth, plotHeight) {
+function drawSeriesLine(ctx, series, labels, padding, plotWidth, plotHeight, maxValue) {
     var values = series.values || [];
-    var numericValues = values.filter(function(value) {
-        return typeof value === 'number' && !Number.isNaN(value) && value !== null && value !== undefined;
-    });
-    if (!numericValues.length) return;
-
-    var maxValue = Math.max.apply(null, numericValues.concat([1]));
-    var minValue = Math.min.apply(null, numericValues.concat([0]));
-    var range = maxValue - minValue || 1;
+    if (!values.length) return;
 
     ctx.strokeStyle = series.color || '#2563eb';
     ctx.fillStyle = series.color || '#2563eb';
@@ -192,13 +209,14 @@ function drawSeriesLine(ctx, series, labels, padding, plotWidth, plotHeight) {
 
     var hasStarted = false;
     values.forEach(function(value, index) {
-        if (typeof value !== 'number' || Number.isNaN(value) || value === null || value === undefined) {
+        var numberValue = Number(value || 0);
+        if (Number.isNaN(numberValue)) {
             hasStarted = false;
             return;
         }
 
         var x = pointX(index, labels.length, padding.left, plotWidth);
-        var y = padding.top + plotHeight - ((value - minValue) / range) * plotHeight;
+        var y = padding.top + plotHeight - (numberValue / maxValue) * plotHeight;
 
         if (!hasStarted) {
             ctx.moveTo(x, y);
@@ -210,9 +228,10 @@ function drawSeriesLine(ctx, series, labels, padding, plotWidth, plotHeight) {
     ctx.stroke();
 
     values.forEach(function(value, index) {
-        if (typeof value !== 'number' || Number.isNaN(value) || value === null || value === undefined) return;
+        var numberValue = Number(value || 0);
+        if (Number.isNaN(numberValue)) return;
         var x = pointX(index, labels.length, padding.left, plotWidth);
-        var y = padding.top + plotHeight - ((value - minValue) / range) * plotHeight;
+        var y = padding.top + plotHeight - (numberValue / maxValue) * plotHeight;
         ctx.beginPath();
         ctx.arc(x, y, 3, 0, Math.PI * 2);
         ctx.fill();

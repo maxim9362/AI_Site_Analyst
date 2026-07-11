@@ -22,6 +22,7 @@ class UserRead(BaseModel):
 
     id: uuid.UUID
     email: str
+    account_plan: str = "partner"
     is_active: bool
     created_at: datetime
     updated_at: datetime

@@ -1,19 +1,80 @@
 {% extends "user_base.html" %}
 
-{% block title %}{{ site.name }} - AI Site Analyst{% endblock %}
+{% set display_site_name = site.domain if "?" in site.name else site.name %}
+{% block title %}{{ display_site_name }} - AI Site Analyst{% endblock %}
 
 {% block content %}
-<div class="product-header">
-    <div>
+{% set score = namespace(value=None) %}
+{% if dashboard.site_score and not dashboard.site_score.error and dashboard.site_score.overall_score is not none %}
+    {% set score.value = dashboard.site_score.overall_score %}
+{% endif %}
+{% if score.value is none %}
+    {% set overview_status = "Данных пока недостаточно" %}
+    {% set overview_message = "Установите JS-код, чтобы сервис начал собирать реальные посещения, клики и действия пользователей." %}
+    {% set overview_tone = "waiting" %}
+{% elif score.value >= 80 %}
+    {% set overview_status = "Хорошее состояние" %}
+    {% set overview_message = "Сайт выглядит стабильно, но стоит регулярно проверять SEO, скорость и конверсию." %}
+    {% set overview_tone = "good" %}
+{% elif score.value >= 60 %}
+    {% set overview_status = "Есть что улучшить" %}
+    {% set overview_message = "Сайт работает, но часть факторов может мешать заявкам и росту трафика." %}
+    {% set overview_tone = "middle" %}
+{% else %}
+    {% set overview_status = "Требует внимания" %}
+    {% set overview_message = "Сайт плохо подготовлен к получению заявок или пока не даёт достаточно данных для уверенного анализа." %}
+    {% set overview_tone = "attention" %}
+{% endif %}
+{% set overview_problem = dashboard.latest_ai_report.main_problem if dashboard.latest_ai_report else overview_message %}
+
+<div class="product-header dashboard-overview-hero dashboard-overview-{{ overview_tone }}">
+    <div class="dashboard-overview-main">
         <a href="/sites" class="back-link">Все сайты</a>
-        <h1>{{ site.name }}</h1>
+        <span class="section-kicker">Обзор сайта</span>
+        <h1>{{ display_site_name }}</h1>
         <p>{{ site.domain }}</p>
+
+        <div class="dashboard-overview-problem">
+            <span>Главная проблема</span>
+            <strong>{{ overview_problem }}</strong>
+        </div>
+
+        <div class="dashboard-overview-actions">
+            <form method="post" action="/sites/{{ site.site_id }}/analysis/run">
+                <button class="btn btn-primary" type="submit">Запустить новый анализ</button>
+            </form>
+            <a class="btn btn-secondary" href="/sites/{{ site.site_id }}/install">Показать код подключения</a>
+            <a class="btn btn-secondary" href="{{ public_url }}" target="_blank" rel="noopener">Открыть сайт</a>
+        </div>
     </div>
-    <div class="product-header-meta">
-        <span>Site ID</span>
-        <code>{{ site.site_id }}</code>
-        <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код подключения</a>
-        <a class="btn btn-small" href="{{ public_url }}" target="_blank" rel="noopener">Сайт</a>
+
+    <div class="dashboard-overview-score">
+        <span>Оценка сайта</span>
+        {% if score.value is not none %}
+        <strong>{{ score.value }}<small>/100</small></strong>
+        {% else %}
+        <strong>-<small>/100</small></strong>
+        {% endif %}
+        <em>{{ overview_status }}</em>
+        <p>{{ dashboard.site_status.message if dashboard.site_status else overview_message }}</p>
+    </div>
+
+    <div class="product-header-meta dashboard-technical-meta">
+        <details>
+            <summary>Техническая информация</summary>
+            <div class="technical-summary">
+                <div>
+                    <span>Технический ID</span>
+                    <code>{{ site.site_id }}</code>
+                </div>
+                {% if dashboard.site_status %}
+                <div>
+                    <span>Служебный статус</span>
+                    <strong>{{ dashboard.site_status.status_label }}</strong>
+                </div>
+                {% endif %}
+            </div>
+        </details>
     </div>
 </div>
 
@@ -22,9 +83,9 @@
     {"key": "analytics", "label": "Посетители", "hint": "Просмотры, клики, цели и боты"},
     {"key": "search", "label": "Поиск", "hint": "Google, CTR, позиции и запросы"},
     {"key": "sources", "label": "Источники", "hint": "Откуда пришли пользователи"},
-    {"key": "pagespeed", "label": "Скорость", "hint": "Mobile, desktop и детали Lighthouse"},
-    {"key": "ai", "label": "AI-отчет", "hint": "Выводы и главная проблема"},
-    {"key": "install", "label": "Код", "hint": "Подключение трекера к сайту"}
+    {"key": "pagespeed", "label": "Скорость", "hint": "Мобильная и компьютерная версия"},
+    {"key": "ai", "label": "AI-отчет", "hint": "Краткий вывод и главная проблема"},
+    {"key": "install", "label": "Код", "hint": "Код подключения к сайту"}
 ] %}
 
 <section class="mobile-dashboard-home" aria-label="Мобильное меню разделов">
@@ -52,51 +113,37 @@
     </div>
 </section>
 
-{% if dashboard.site_score and not dashboard.site_score.error %}
-<section class="section">
-    <div class="score-card">
-        <div class="score-main">
-            {% if dashboard.site_score.overall_score is not none %}
-            <div class="score-number">{{ dashboard.site_score.overall_score }}<span class="score-total">/100</span></div>
-            {% else %}
-            <div class="score-number score-no-data">-<span class="score-total">/100</span></div>
-            {% endif %}
-            <div class="score-info">
-                <div class="section-title-row">
-                    <span class="score-label-text">{{ dashboard.site_score.label }}</span>
-                    <details class="info-popover">
-                        <summary aria-label="Информация о блоке">i</summary>
-                        <div>Общая оценка сайта по данным поведения, SEO, технического состояния и готовности к анализу.</div>
-                    </details>
-                </div>
-                <p>{{ dashboard.site_score.message }}</p>
-            </div>
-        </div>
-    </div>
-</section>
-{% endif %}
-
-{% if dashboard.site_status %}
-<section class="section">
-    <div class="status-card status-{{ dashboard.site_status.status }}">
-        <div class="status-card-main">
+<section class="section dashboard-ai-summary">
+    <div class="ai-report-card">
+        <div class="section-heading">
+            <span class="section-kicker">Краткий AI-вывод</span>
             <div class="section-title-row">
-                <span class="section-kicker">Статус сайта</span>
+                <h2>Что сейчас с сайтом</h2>
                 <details class="info-popover">
                     <summary aria-label="Информация о блоке">i</summary>
-                    <div>Показывает, хватает ли данных для анализа: установлен ли код, есть ли события, снимки страниц и отчеты.</div>
+                    <div>Короткий вывод помогает быстро понять главное: что хорошо, что мешает заявкам и что проверить первым.</div>
                 </details>
             </div>
-            <strong>{{ dashboard.site_status.status_label }}</strong>
-            <p>{{ dashboard.site_status.message }}</p>
-            <p class="status-eta">Ожидаемое время: {{ dashboard.site_status.eta_label }}</p>
         </div>
+        {% if dashboard.latest_ai_report %}
+        <div class="report-section">
+            <h3>Краткий вывод</h3>
+            <p>{{ dashboard.latest_ai_report.summary }}</p>
+        </div>
+        <div class="report-section">
+            <h3>Главная проблема</h3>
+            <p class="problem-text">{{ dashboard.latest_ai_report.main_problem }}</p>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>AI-вывод пока не готов. Запустите анализ сайта, чтобы получить рекомендации.</p>
+        </div>
+        {% endif %}
         <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
-            <button class="btn btn-primary" type="submit">Запустить анализ</button>
+            <button class="btn btn-primary" type="submit">{{ "Перезапустить AI-анализ" if dashboard.latest_ai_report else "Запустить анализ" }}</button>
         </form>
     </div>
 </section>
-{% endif %}
 
 {% if dashboard.tracker_analytics %}
 <section class="section">
@@ -162,6 +209,19 @@
         {% endif %}
     </div>
     {% endif %}
+</section>
+{% else %}
+<section class="section">
+    <div class="status-card status-no_data">
+        <div class="status-card-main">
+            <span class="section-kicker">Посетители и действия</span>
+            <strong>Реальные данные появятся после установки JS-кода</strong>
+            <p>Сервис начнет показывать посетителей, просмотры, клики, источники трафика и заявки после подключения кода на сайт.</p>
+        </div>
+        <div class="status-card-actions">
+            <a class="btn btn-primary" href="/sites/{{ site.site_id }}/install">Показать код подключения</a>
+        </div>
+    </div>
 </section>
 {% endif %}
 
@@ -403,23 +463,23 @@
     <div class="section-heading">
         <span class="section-kicker">PageSpeed Insights</span>
         <div class="section-title-row">
-            <h2>Скорость и техническое качество</h2>
+            <h2>Скорость и удобство сайта</h2>
             <details class="info-popover">
                 <summary aria-label="Информация о блоке">i</summary>
-                <div>Замер Lighthouse: скорость загрузки, Core Web Vitals, доступность, best practices и техническое SEO.</div>
+                <div>Проверяет, быстро ли открывается сайт, удобно ли им пользоваться и нет ли заметных технических проблем.</div>
             </details>
         </div>
-        <p>Данные Lighthouse помогают AI учитывать скорость, Core Web Vitals, доступность, best practices и SEO.</p>
+        <p>Показывает, насколько сайт готов для пользователей с телефона и компьютера.</p>
     </div>
 
     <div class="action-buttons">
         <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
             <input type="hidden" name="strategy" value="mobile">
-            <button type="submit" class="btn btn-secondary">Проверить mobile</button>
+            <button type="submit" class="btn btn-secondary">Проверить мобильную версию</button>
         </form>
         <form method="POST" action="/sites/{{ site.site_id }}/pagespeed/run">
             <input type="hidden" name="strategy" value="desktop">
-            <button type="submit" class="btn btn-secondary">Проверить desktop</button>
+            <button type="submit" class="btn btn-secondary">Проверить компьютерную версию</button>
         </form>
     </div>
 
@@ -427,17 +487,17 @@
     <div class="product-metrics">
         {% for strategy, result in dashboard.pagespeed.items() %}
         <div class="metric-card">
-            <span class="metric-label">{{ strategy }}</span>
+            <span class="metric-label">{{ "Мобильная версия" if strategy == "mobile" else "Компьютерная версия" }}</span>
             {% if result.error %}
             <strong class="metric-number">-</strong>
             <p>{{ result.error }}</p>
             <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
             {% else %}
             <strong class="metric-number">{{ "%.0f"|format(result.performance_score or 0) }}</strong>
-            <p>Performance</p>
+            <p>Скорость открытия страницы</p>
             <div class="metric-list">
-                <div><span>Accessibility</span><strong>{{ "%.0f"|format(result.accessibility_score or 0) }}</strong></div>
-                <div><span>Best Practices</span><strong>{{ "%.0f"|format(result.best_practices_score or 0) }}</strong></div>
+                <div><span>Доступность</span><strong>{{ "%.0f"|format(result.accessibility_score or 0) }}</strong></div>
+                <div><span>Технические практики</span><strong>{{ "%.0f"|format(result.best_practices_score or 0) }}</strong></div>
                 <div><span>SEO</span><strong>{{ "%.0f"|format(result.seo_score or 0) }}</strong></div>
             </div>
             <a class="btn btn-small" href="/sites/{{ site.site_id }}/pagespeed/{{ strategy }}">Подробнее</a>
@@ -447,9 +507,22 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <p>PageSpeed еще не запускался для этого сайта.</p>
+        <p>Данных по скорости пока нет. Запустите проверку мобильной или компьютерной версии.</p>
     </div>
     {% endif %}
+</section>
+
+<section class="section dashboard-install-reminder">
+    <div class="integration-panel">
+        <div>
+            <span class="section-kicker">Код подключения</span>
+            <h2>Зачем нужен JS-код</h2>
+            <p>Добавьте код перед закрывающим тегом &lt;/body&gt; на сайте. После установки сервис начнет собирать посещения, клики, заявки и действия пользователей.</p>
+        </div>
+        <div class="integration-panel-actions">
+            <a class="btn btn-primary" href="/sites/{{ site.site_id }}/install">Открыть код подключения</a>
+        </div>
+    </div>
 </section>
 
 <section class="section">
@@ -457,27 +530,17 @@
         <div class="section-heading">
             <span class="section-kicker">AI-отчет</span>
             <div class="section-title-row">
-                <h2>Последний вывод</h2>
+                <h2>Что сделать в первую очередь</h2>
                 <details class="info-popover">
                     <summary aria-label="Информация о блоке">i</summary>
-                    <div>AI-вывод строится на данных трекера, Search Console, PageSpeed и снимках страниц.</div>
+                    <div>AI-вывод строится на данных посещений, Search Console, PageSpeed и снимках страниц. Здесь показаны ближайшие шаги, а не технические детали.</div>
                 </details>
             </div>
         </div>
 
         {% if dashboard.latest_ai_report %}
-        {% set ai_raw = dashboard.latest_ai_report.raw_ai_response or {} %}
-        <div class="ai-source-status {{ 'is-fallback' if ai_raw.get('source') != 'gemini' else 'is-live' }}">
-            {% if ai_raw.get('source') == 'gemini' %}
-            <span>Gemini AI работает</span>
-            <strong>{{ ai_raw.get('model') or 'Gemini' }}</strong>
-            {% else %}
-            <span>Локальный резервный анализ</span>
-            <strong>Проверьте Gemini API или запустите отчет заново</strong>
-            {% endif %}
-        </div>
         <div class="report-section">
-            <h3>Что происходит</h3>
+            <h3>Краткий вывод</h3>
             <p>{{ dashboard.latest_ai_report.summary }}</p>
         </div>
         <div class="report-section">
@@ -495,14 +558,14 @@
         </div>
         {% endif %}
         <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
-            <button class="btn btn-primary" type="submit">Перезапустить AI-анализ</button>
+            <button class="btn btn-primary" type="submit">Запустить новый анализ</button>
         </form>
         {% else %}
         <div class="empty-state">
-            <p>AI-отчет появится после сбора данных и запуска анализа.</p>
+            <p>AI-вывод пока не готов. Запустите анализ сайта, чтобы получить рекомендации.</p>
         </div>
         <form class="status-card-actions" method="post" action="/sites/{{ site.site_id }}/analysis/run">
-            <button class="btn btn-primary" type="submit">Запустить AI-анализ</button>
+            <button class="btn btn-primary" type="submit">Запустить анализ</button>
         </form>
         {% endif %}
     </div>

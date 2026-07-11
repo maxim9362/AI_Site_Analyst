@@ -12,6 +12,40 @@
     <a class="btn btn-primary" href="/sites/new">Привязать сайт</a>
 </div>
 
+{% if account_limits %}
+<section class="account-mode-card">
+    <div>
+        <span class="eyebrow">Режим аккаунта</span>
+        <h2>{{ account_limits.label }}</h2>
+        <p>Сайтов подключено: {{ current_site_count }} из {{ account_limits.max_sites }}.</p>
+    </div>
+    <div class="account-mode-features" aria-label="Доступно в текущем режиме">
+        {% for feature in account_limits.feature_labels %}
+        <span>{{ feature }}</span>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
+{% if partner_overview %}
+<section class="partner-overview-card">
+    <div class="section-heading-row">
+        <div>
+            <span class="eyebrow">Обзор по клиентским сайтам</span>
+            <h2>Где работать первым</h2>
+        </div>
+        <a class="btn btn-secondary" href="/clients">Клиенты</a>
+    </div>
+    <div class="partner-overview-grid">
+        <div><span>Всего сайтов</span><strong>{{ partner_overview.total_sites }}</strong></div>
+        <div><span>Требуют внимания</span><strong>{{ partner_overview.attention_sites }}</strong></div>
+        <div><span>Код не установлен</span><strong>{{ partner_overview.without_code }}</strong></div>
+        <div><span>Нет свежего анализа</span><strong>{{ partner_overview.without_fresh_analysis }}</strong></div>
+        <div><span>В хорошем состоянии</span><strong>{{ partner_overview.healthy_sites }}</strong></div>
+    </div>
+</section>
+{% endif %}
+
 {% if sites %}
 <div class="table-container sites-table">
     <table>
@@ -19,7 +53,8 @@
             <tr>
                 <th>Название</th>
                 <th>Домен</th>
-                <th>Site ID</th>
+                <th>Клиент</th>
+                <th>Технический ID</th>
                 <th>Статус</th>
                 <th></th>
             </tr>
@@ -30,19 +65,27 @@
             <tr>
                 <td><a class="back-link" href="/sites/{{ site.site_id }}">{{ site.name }}</a></td>
                 <td class="text-break">{{ site.domain }}</td>
+                <td>
+                    {% if row.client %}
+                    <a class="back-link" href="/clients/{{ row.client.id }}">{{ row.client.name }}</a>
+                    {% else %}
+                    <span class="muted-text">Клиент не указан</span>
+                    {% endif %}
+                </td>
                 <td><code class="site-id-code">{{ site.site_id }}</code></td>
                 <td>
-                    {% if site.is_active %}
-                    <span class="status status-active">Активен</span>
+                    {% if row.needs_attention %}
+                    <span class="status status-inactive">{{ row.status_label }}</span>
                     {% else %}
-                    <span class="status status-inactive">Отключен</span>
+                    <span class="status status-active">{{ row.status_label }}</span>
                     {% endif %}
+                    <small class="site-row-note">Последний анализ: {{ row.latest_analysis_label }}</small>
                 </td>
                 <td>
                     <div class="table-actions">
-                        <a class="btn btn-small" href="/sites/{{ site.site_id }}">Dashboard</a>
-                        <a class="btn btn-small" href="{{ row.public_url }}" target="_blank" rel="noopener">Сайт</a>
-                        <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код</a>
+                        <a class="btn btn-small" href="/sites/{{ site.site_id }}">Аналитика</a>
+                        <a class="btn btn-small" href="{{ row.public_url }}" target="_blank" rel="noopener">Открыть сайт</a>
+                        <a class="btn btn-small" href="/sites/{{ site.site_id }}/install">Код подключения</a>
                     </div>
                 </td>
             </tr>
@@ -59,21 +102,30 @@
             <div>
                 <h2>{{ site.name }}</h2>
                 <p>{{ site.domain }}</p>
+                {% if row.client %}
+                <p>Клиент: {{ row.client.name }}</p>
+                {% else %}
+                <p>Клиент не указан</p>
+                {% endif %}
             </div>
-            {% if site.is_active %}
-            <span class="status status-active">Активен</span>
+            {% if row.needs_attention %}
+            <span class="status status-inactive">{{ row.status_label }}</span>
             {% else %}
-            <span class="status status-inactive">Отключен</span>
+            <span class="status status-active">{{ row.status_label }}</span>
             {% endif %}
         </div>
+        <div class="client-site-meta">
+            <span>Оценка: {{ row.score }}/100</span>
+            <span>Последний анализ: {{ row.latest_analysis_label }}</span>
+        </div>
         <div class="site-id-box">
-            <span>Site ID</span>
+            <span>Технический ID</span>
             <code>{{ site.site_id }}</code>
         </div>
         <div class="site-mobile-actions">
-            <a class="btn btn-primary" href="/sites/{{ site.site_id }}">Открыть dashboard</a>
-            <a class="btn btn-secondary" href="{{ row.public_url }}" target="_blank" rel="noopener">Сайт</a>
-            <a class="btn btn-secondary" href="/sites/{{ site.site_id }}/install">Код</a>
+            <a class="btn btn-primary" href="/sites/{{ site.site_id }}">Открыть аналитику</a>
+            <a class="btn btn-secondary" href="{{ row.public_url }}" target="_blank" rel="noopener">Открыть сайт</a>
+            <a class="btn btn-secondary" href="/sites/{{ site.site_id }}/install">Код подключения</a>
         </div>
     </article>
     {% endfor %}
@@ -82,7 +134,7 @@
 <div class="empty-state">
     <span class="eyebrow">Начало работы</span>
     <h2>Пока нет подключенных сайтов</h2>
-    <p>Добавьте первый сайт, чтобы получить код трекера и начать сбор аналитики.</p>
+    <p>Добавьте первый сайт, чтобы получить JS-код подключения и начать сбор аналитики.</p>
     <a class="btn btn-primary" href="/sites/new">Привязать первый сайт</a>
 </div>
 {% endif %}

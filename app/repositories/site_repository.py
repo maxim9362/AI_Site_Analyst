@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.site import Site
@@ -52,3 +52,7 @@ class SiteRepository:
     async def list_sites_by_user(self, user_id: uuid.UUID) -> list[Site]:
         result = await self.session.execute(select(Site).where(Site.user_id == user_id).order_by(Site.created_at.desc()))
         return list(result.scalars().all())
+
+    async def count_sites_by_user(self, user_id: uuid.UUID) -> int:
+        result = await self.session.execute(select(func.count()).select_from(Site).where(Site.user_id == user_id))
+        return int(result.scalar_one())

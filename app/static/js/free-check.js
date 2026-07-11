@@ -7,8 +7,10 @@
     const scoreEl = document.getElementById("freeCheckScore");
     const summaryEl = document.getElementById("freeCheckSummary");
     const findingsEl = document.getElementById("freeCheckFindings");
+    const strengthsEl = document.getElementById("freeCheckStrengths");
     const winsEl = document.getElementById("freeCheckWins");
     const registerLink = document.getElementById("freeCheckRegister");
+    const submitButton = document.getElementById("freeCheckSubmit") || form?.querySelector("button[type='submit']");
 
     if (!form) {
         return;
@@ -22,11 +24,25 @@
 
     function fillList(element, items) {
         element.innerHTML = "";
-        (items || []).slice(0, 5).forEach((item) => {
+        (items || []).slice(0, 3).forEach((item) => {
             const li = document.createElement("li");
             li.textContent = item;
             element.appendChild(li);
         });
+    }
+
+    function setSubmitting(isSubmitting) {
+        if (input) {
+            input.disabled = isSubmitting;
+        }
+        if (submitButton) {
+            if (!submitButton.dataset.originalText) {
+                submitButton.dataset.originalText = submitButton.textContent;
+            }
+            submitButton.disabled = isSubmitting;
+            submitButton.textContent = isSubmitting ? "Проверяем..." : submitButton.dataset.originalText;
+        }
+        form.classList.toggle("is-submitting", isSubmitting);
     }
 
     function showError(message) {
@@ -46,6 +62,7 @@
         setHidden(errorBox, true);
         setHidden(resultBox, true);
         setHidden(loading, false);
+        setSubmitting(true);
 
         try {
             const response = await fetch("/api/public/site-check", {
@@ -62,6 +79,9 @@
             scoreEl.textContent = data.score;
             summaryEl.textContent = data.summary;
             fillList(findingsEl, data.findings);
+            if (strengthsEl) {
+                fillList(strengthsEl, data.strengths || []);
+            }
             fillList(winsEl, data.quick_wins);
             registerLink.href = `/register?site_url=${encodeURIComponent(data.url || url)}`;
             setHidden(resultBox, false);
@@ -70,6 +90,7 @@
             showError("Сайт не ответил или проверка временно недоступна.");
         } finally {
             setHidden(loading, true);
+            setSubmitting(false);
         }
     });
 })();

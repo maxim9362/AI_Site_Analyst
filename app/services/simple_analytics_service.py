@@ -253,6 +253,11 @@ def _empty_analytics(days: int, message: str) -> dict[str, Any]:
             "form_starts": 0,
             "form_submits": 0,
         },
+        "timeseries": {
+            "labels": [],
+            "site_visits": [],
+            "pageviews": [],
+        },
         "bots": {
             "total_events": 0,
             "unique_bots": 0,
@@ -603,7 +608,6 @@ async def get_simple_site_analytics(
             days,
             "Пока недостаточно данных. Система собирает аналитику.",
         )
-        empty["timeseries"] = {"labels": [], "site_visits": [], "pageviews": []}
         empty["realtime_search"] = _build_realtime_search_analytics([], [], days)
         empty["traffic_sources"] = {"items": [], "total": 0}
         empty["utm_campaigns"] = {"items": []}

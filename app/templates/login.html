@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход - AI Site Analyst</title>
     <link rel="stylesheet" href="/static/css/style.css?v=20260707-ui2">
-    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260708-free-check3">
+    <link rel="stylesheet" href="/static/css/user-ui.css?v=20260711-stage12">
 </head>
 <body class="auth-body">
     <nav class="navbar auth-navbar">
@@ -17,20 +17,41 @@
             </a>
         </div>
         <div class="nav-links">
-            <a href="/">Проверить сайт бесплатно</a>
+            <a href="/free-check">Проверить сайт бесплатно</a>
+            <a href="/demo">Посмотреть демо</a>
             <a href="/register">Регистрация</a>
         </div>
     </nav>
-    <main class="auth-shell">
-        <section class="login-card auth-card">
-            <span class="eyebrow">Личный кабинет</span>
-            <h1>Вход</h1>
-            <p>Войдите в аккаунт, чтобы управлять сайтами и смотреть аналитику.</p>
-            <div class="auth-free-check-card">
-                <strong>Хотите сначала проверить сайт?</strong>
-                <span>Бесплатный предварительный анализ работает без регистрации.</span>
-                <a href="/">Открыть проверку сайта</a>
+    <div class="mobile-floating-nav" data-mobile-menu>
+        <button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню" aria-controls="mobileFloatingMenu" aria-expanded="false">
+            <span aria-hidden="true">☰</span>
+        </button>
+        <nav class="mobile-menu-panel" id="mobileFloatingMenu" data-mobile-menu-panel aria-label="Мобильное меню">
+            <a class="mobile-menu-primary" href="/free-check">Бесплатная проверка</a>
+            <a href="/demo">Демо</a>
+            <a href="/login">Войти</a>
+            <a href="/register">Регистрация</a>
+        </nav>
+    </div>
+    <main class="auth-shell auth-funnel-shell">
+        <section class="auth-funnel">
+            <div class="auth-funnel-copy">
+                <span class="section-kicker">Личный кабинет</span>
+                <h1>AI Site Analyst</h1>
+                <p>Войдите в аккаунт, чтобы управлять сайтами, смотреть отчёты и получать AI-рекомендации.</p>
+                <div class="auth-feature-list" aria-label="Что внутри сервиса">
+                    <span>Список сайтов</span>
+                    <span>Бесплатная проверка</span>
+                    <span>AI-отчёты</span>
+                    <span>Код подключения</span>
+                    <span>Рекомендации по улучшению</span>
+                </div>
             </div>
+
+            <div class="login-card auth-card auth-funnel-card">
+                <span class="eyebrow">Вход</span>
+                <h2>Добро пожаловать</h2>
+                <p>Введите email и пароль, чтобы открыть аналитику ваших сайтов.</p>
             {% if error %}<div class="alert alert-error">{{ error }}</div>{% endif %}
             {% if message %}<div class="alert alert-success">{{ message }}</div>{% endif %}
             {% if google_login_enabled %}
@@ -49,11 +70,13 @@
                 <button type="submit" class="btn btn-primary">Войти</button>
             </form>
             <div class="auth-links">
-                <a href="/">Проверить сайт бесплатно</a>
                 <a href="/forgot-password">Забыли пароль?</a>
-                <a href="/register">Создать аккаунт</a>
+                <a href="/demo">Посмотреть демо</a>
+                <a href="/register">Нет аккаунта? Зарегистрироваться</a>
+            </div>
             </div>
         </section>
     </main>
+    <script src="/static/js/ui.js?v=20260711-stage12"></script>
 </body>
 </html>

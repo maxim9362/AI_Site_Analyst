@@ -1,10 +1,11 @@
 import logging
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.admin.routes import router as admin_router
 from app.api.router import api_router
@@ -20,6 +21,7 @@ setup_logging()
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 action_logger = logging.getLogger("app.actions")
+templates = Jinja2Templates(directory="app/templates")
 
 # For production, set ALLOWED_ORIGINS to client domains only (e.g. "https://site1.com,https://site2.com").
 allowed_origins_raw = settings.ALLOWED_ORIGINS
@@ -62,6 +64,16 @@ app.include_router(public_router)
 app.include_router(api_router)
 app.include_router(auth_router)
 app.include_router(admin_router)
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return templates.TemplateResponse(request, "404.html", {}, status_code=404)
+
+
+@app.exception_handler(500)
+async def server_error_handler(request: Request, exc):
+    return templates.TemplateResponse(request, "500.html", {}, status_code=500)
 
 
 @app.get("/demo", response_class=HTMLResponse)

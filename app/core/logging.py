@@ -21,19 +21,12 @@ def setup_logging() -> None:
     logger = logging.getLogger("app")
     logger.info(f"Starting {settings.APP_NAME} in {settings.APP_ENV} mode")
 
-    # В локальной консоли сразу показываем основные ссылки, чтобы запуск MVP было легко проверить вручную.
     local_base_url = settings.LOCAL_APP_BASE_URL.rstrip("/")
     public_base_url = settings.APP_BASE_URL.rstrip("/")
-
     logger.info(f"Open locally: {local_base_url}/")
     logger.info(f"Local login: {local_base_url}/login")
     logger.info(f"Local register: {local_base_url}/register")
     logger.info(f"Local admin: {local_base_url}/admin/clients")
-    if public_base_url != local_base_url:
-        logger.info(f"Public base URL for server deploy: {public_base_url}")
-        logger.info(f"Public free site check: {public_base_url}/")
-        logger.info(f"Public login: {public_base_url}/login")
-        logger.info(f"Public register: {public_base_url}/register")
     logger.info(f"Admin clients: {public_base_url}/admin/clients")
     if settings.ENABLE_DEMO_ENDPOINTS:
         logger.info(f"Demo site: {public_base_url}/demo")

@@ -62,6 +62,7 @@ class ProductDashboardService:
         gsc_connected = bool(gsc_summary and gsc_summary.get("is_connected"))
 
         chart_data = await self._build_chart_data(site.id, period_option, gsc_time_series or [], gsc_connected=gsc_connected)
+        performance_chart_data = self._build_performance_chart_data(simple_analytics)
         gsc_chart_data = self._build_gsc_chart_data(
             period_option,
             gsc_time_series or [],
@@ -106,6 +107,7 @@ class ProductDashboardService:
             "gsc_chart_data": gsc_chart_data,
             "pagespeed": pagespeed,
             "chart_data": chart_data,
+            "performance_chart_data": performance_chart_data,
             "latest_ai_report": latest_report,
             "ai_insights": ai_insights,
             "tracker_code": (
@@ -114,6 +116,18 @@ class ProductDashboardService:
             ),
             "technical_counts": technical_counts,
             "site_score": site_score,
+        }
+
+    def _build_performance_chart_data(self, simple_analytics: dict[str, Any] | None) -> dict[str, list[Any]]:
+        timeseries = (simple_analytics or {}).get("timeseries") or {}
+        return {
+            "labels": timeseries.get("labels") or [],
+            "site_visits": timeseries.get("site_visits") or [],
+            "pageviews": timeseries.get("pageviews") or [],
+            "seo_impressions": [],
+            "seo_clicks": [],
+            "ctr": [],
+            "position": [],
         }
 
     async def _build_chart_data(
